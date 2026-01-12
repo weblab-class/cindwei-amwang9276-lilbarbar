@@ -1,60 +1,42 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import type { Sidequest } from "../types/sidequest";
 import SidequestCard from "../components/SidequestCard";
 import SubmitQuestModal from "../components/SubmitQuestModal";
-import type { Sidequest } from "../types/sidequest";
+import ShareQuestModal from "../components/ShareQuestModal";
+import { fetchQuests, createQuest, voteQuest } from "../services/api";
+import { useAuth } from "../context/AuthContext";
 
-const INITIAL_QUESTS: Sidequest[] = [
-  {
-    id: "1",
-    title: "Watch the sunrise somewhere new",
-    icon: "🌅",
-    votes: 12,
-  },
-  {
-    id: "2",
-    title: "Talk to a stranger and learn their story",
-    icon: "🗣️",
-    votes: 8,
-  },
-  {
-    id: "3",
-    title: "Walk 10k steps without headphones",
-    icon: "🚶‍♀️",
-    votes: 5,
-  },
-];
+
 
 export default function Home() {
-  const [quests, setQuests] = useState<Sidequest[]>(INITIAL_QUESTS);
+  const { token } = useAuth();
+  const [quests, setQuests] = useState<Sidequest[]>([]);
   const [showModal, setShowModal] = useState(false);
+  const [shareQuestId, setShareQuestId] = useState<string | null>(null);
 
-  function handleVote(id: string, delta: number) {
+  useEffect(() => {
+    fetchQuests().then(setQuests);
+  }, []);
+
+  async function handleVote(id: string, delta: number) {
+    if (!token) return;
+    const updated = await voteQuest(token, id, delta);
     setQuests((qs) =>
-      [...qs]
-        .map((q) =>
-          q.id === id ? { ...q, votes: q.votes + delta } : q
-        )
+      qs
+        .map((q) => (q.id === id ? updated : q))
         .sort((a, b) => b.votes - a.votes)
     );
   }
 
-  function handleSubmit(newQuest: Sidequest) {
-    setQuests((qs) => [newQuest, ...qs]);
-  }
-
-  function handleShare(id: string) {
-    alert(`Sharing quest ${id} (Phase 4)`);
+  async function handleSubmit(title: string, icon: string) {
+    if (!token) return;
+    const quest = await createQuest(token, title, icon);
+    setQuests((qs) => [quest, ...qs]);
   }
 
   return (
     <div style={{ padding: 24 }}>
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          marginBottom: 16,
-        }}
-      >
+      <div style={{ display: "flex", justifyContent: "space-between" }}>
         <h2>Trending Sidequests</h2>
         <button onClick={() => setShowModal(true)}>+ New Quest</button>
       </div>
@@ -64,14 +46,20 @@ export default function Home() {
           key={q.id}
           quest={q}
           onVote={handleVote}
-          onShare={handleShare}
+          onShare={() => setShareQuestId(q.id)}
         />
       ))}
+      {shareQuestId && (
+        <ShareQuestModal
+          questId={shareQuestId}
+          onClose={() => setShareQuestId(null)}
+        />
+      )}
 
       {showModal && (
         <SubmitQuestModal
           onClose={() => setShowModal(false)}
-          onSubmit={handleSubmit}
+          onSubmit={(q) => handleSubmit(q.title, q.icon)}
         />
       )}
     </div>

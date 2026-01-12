@@ -1,44 +1,63 @@
-// import {
-//   createContext,
-//   useContext,
-//   useState,
-//   ReactNode,
-// } from "react";
+import { createContext, useContext, useState, ReactNode } from "react";
 
-// interface User {
-//   username: string;
-// }
+interface User {
+  username: string;
+}
 
-// interface AuthContextType {
-//   user: User | null;
-//   login: (username: string) => void;
-//   logout: () => void;
-// }
+interface AuthContextType {
+  user: User | null;
+  token: string | null;
+  login: (username: string, password: string) => Promise<void>;
+  signup: (username: string, password: string) => Promise<void>;
+  logout: () => void;
+}
 
-// const AuthContext = createContext<AuthContextType | undefined>(
-//   undefined
-// );
+const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// export function AuthProvider({ children }: { children: ReactNode }) {
-//   const [user, setUser] = useState<User | null>(null);
+const API = import.meta.env.VITE_API_URL;
 
-//   const login = (username: string) => {
-//     setUser({ username });
-//   };
+export function AuthProvider({ children }: { children: ReactNode }) {
+  const [user, setUser] = useState<User | null>(null);
+  const [token, setToken] = useState<string | null>(null);
 
-//   const logout = () => setUser(null);
+  async function login(username: string, password: string) {
+    const res = await fetch(`${API}/auth/login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username, password }),
+    });
 
-//   return (
-//     <AuthContext.Provider value={{ user, login, logout }}>
-//       {children}
-//     </AuthContext.Provider>
-//   );
-// }
+    const data = await res.json();
+    setToken(data.token);
+    setUser(data.user);
+  }
 
-// export function useAuth(): AuthContextType {
-//   const ctx = useContext(AuthContext);
-//   if (!ctx) {
-//     throw new Error("useAuth must be used inside AuthProvider");
-//   }
-//   return ctx;
-// }
+  async function signup(username: string, password: string) {
+    const res = await fetch(`${API}/auth/signup`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username, password }),
+    });
+
+    const data = await res.json();
+    setToken(data.token);
+    setUser(data.user);
+  }
+
+  function logout() {
+    setUser(null);
+    setToken(null);
+  }
+
+  return (
+    <AuthContext.Provider value={{ user, token, login, signup, logout }}>
+      {children}
+    </AuthContext.Provider>
+  );
+}
+
+export function useAuth() {
+  const ctx = useContext(AuthContext);
+  if (!ctx) throw new Error("useAuth outside provider");
+  return ctx;
+}

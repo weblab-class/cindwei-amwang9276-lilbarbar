@@ -1,5 +1,11 @@
 from pydantic import BaseModel
 
+
+class ShareQuest(BaseModel):
+    quest_id: str
+    to_user_id: str
+
+
 class UserCreate(BaseModel):
     username: str
     password: str

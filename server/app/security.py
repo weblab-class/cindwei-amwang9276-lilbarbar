@@ -3,6 +3,25 @@ from jose import jwt
 from passlib.context import CryptContext
 import os
 
+from fastapi import Depends, HTTPException
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+
+security = HTTPBearer()
+
+def get_current_user_id(
+    creds: HTTPAuthorizationCredentials = Depends(security),
+):
+    try:
+        payload = jwt.decode(
+            creds.credentials,
+            SECRET_KEY,
+            algorithms=[ALGORITHM],
+        )
+        return payload["sub"]
+    except:
+        raise HTTPException(status_code=401)
+
+
 SECRET_KEY = os.getenv("JWT_SECRET")
 ALGORITHM = "HS256"
 
