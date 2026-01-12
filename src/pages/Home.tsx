@@ -1,7 +1,7 @@
 import { useState } from "react";
 import SidequestCard from "../components/SidequestCard";
-import SubmitQuest from "../components/SubmitQuest";
-import { Sidequest } from "../types/sidequest";
+import SubmitQuestModal from "../components/SubmitQuestModal";
+import type { Sidequest } from "../types/sidequest";
 
 const INITIAL_QUESTS: Sidequest[] = [
   {

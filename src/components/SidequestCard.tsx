@@ -1,4 +1,4 @@
-import { Sidequest } from "../types/sidequest";
+import type { Sidequest } from "../types/sidequest";
 import VoteButtons from "./VoteButtons";
 
 interface Props {

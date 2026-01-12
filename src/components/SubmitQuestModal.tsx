@@ -1,12 +1,12 @@
 import { useState } from "react";
-import { Sidequest } from "../types/sidequest";
+import type { Sidequest } from "../types/sidequest";
 
 interface Props {
   onClose: () => void;
   onSubmit: (quest: Sidequest) => void;
 }
 
-export default function SubmitQuest({ onClose, onSubmit }: Props) {
+export default function SubmitQuestModal({ onClose, onSubmit }: Props) {
   const [title, setTitle] = useState("");
   const [icon, setIcon] = useState("✨");
 
