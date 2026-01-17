@@ -237,7 +237,7 @@ export default function Login() {
           style={{
             position: "absolute",
             left: "41%",
-            top: "calc(15vh + 280px)",
+            top: "calc(15vh + 400px)",
             zIndex: 3,
             pointerEvents: "none",
             willChange: "transform",
