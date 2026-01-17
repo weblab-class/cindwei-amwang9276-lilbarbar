@@ -77,26 +77,6 @@ export async function getFriends(token: string) {
   return res.json();
 }
 
-export async function loadConstellation(token: string) {
-  const res = await fetch(`${API}/constellation`, {
-    headers: { Authorization: `Bearer ${token}` },
-  });
-  return res.json();
-}
-
-export async function saveConstellation(
-  token: string,
-  payload: { badges: any[]; lines: any[] }
-) {
-  await fetch(`${API}/constellation`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-    },
-    body: JSON.stringify(payload),
-  });
-}
 
 export async function fetchReceivedQuests(token: string) {
   const res = await fetch(`${API}/quests/received`, {

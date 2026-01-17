@@ -35,7 +35,7 @@ export default function Home() {
   }
 
   return (
-    <div style={{ padding: 24 }}>
+    <div style={{ padding: 24, backgroundColor: "#000000", minHeight: "100vh" }}>
       <div style={{ display: "flex", justifyContent: "space-between" }}>
         <h2>Trending Sidequests</h2>
         <button onClick={() => setShowModal(true)}>+ New Quest</button>

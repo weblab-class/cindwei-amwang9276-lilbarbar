@@ -1,12 +1,22 @@
 * {
   box-sizing: border-box;
+  font-family: 'Courier New', monospace;
+  -webkit-font-smoothing: none;
+  -moz-osx-font-smoothing: unset;
+  font-smooth: never;
+  text-rendering: optimizeSpeed;
+  image-rendering: pixelated;
 }
 
 body {
   margin: 0;
-  background: var(--bg);
+  background: #000000;
   color: var(--text);
-  font-family: Inter, system-ui, sans-serif;
+  font-family: 'Courier New', monospace;
+  -webkit-font-smoothing: none;
+  -moz-osx-font-smoothing: unset;
+  font-smooth: never;
+  text-rendering: optimizeSpeed;
 }
 
 button {
@@ -16,6 +26,11 @@ button {
   border-radius: 8px;
   font-weight: 600;
   cursor: pointer;
+  font-family: 'Courier New', monospace;
+  -webkit-font-smoothing: none;
+  -moz-osx-font-smoothing: unset;
+  font-smooth: never;
+  text-rendering: optimizeSpeed;
 }
 
 button.secondary {
@@ -30,4 +45,9 @@ input {
   border: 1px solid var(--muted);
   background: transparent;
   color: var(--text);
+  font-family: 'Courier New', monospace;
+  -webkit-font-smoothing: none;
+  -moz-osx-font-smoothing: unset;
+  font-smooth: never;
+  text-rendering: optimizeSpeed;
 }

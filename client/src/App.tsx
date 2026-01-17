@@ -20,10 +20,12 @@ export default function App() {
           path="/home"
           element={
             <ProtectedRoute>
-              <>
+              <div style={{ display: "flex" }}>
                 <Navbar />
-                <Home />
-              </>
+                <div style={{ marginLeft: "200px", width: "calc(100% - 200px)" }}>
+                  <Home />
+                </div>
+              </div>
             </ProtectedRoute>
           }
         />
@@ -32,10 +34,12 @@ export default function App() {
           path="/profile"
           element={
             <ProtectedRoute>
-              <>
+              <div style={{ display: "flex" }}>
                 <Navbar />
-                <Profile />
-              </>
+                <div style={{ marginLeft: "200px", width: "calc(100% - 200px)" }}>
+                  <Profile />
+                </div>
+              </div>
             </ProtectedRoute>
           }
         />

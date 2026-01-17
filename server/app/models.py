@@ -55,11 +55,3 @@ class CompletedQuest(Base):
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
     user_id = Column(String, ForeignKey("users.id"))
     quest_id = Column(String, ForeignKey("quests.id"))
-
-
-class ConstellationLayout(Base):
-    __tablename__ = "constellation_layouts"
-
-    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
-    user_id = Column(String, unique=True)
-    data = Column(String)  # JSON string

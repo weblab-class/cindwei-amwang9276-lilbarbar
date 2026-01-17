@@ -5,15 +5,12 @@ import {
   getIncomingRequests,
   respondFriendRequest,
   getFriends,
-  loadConstellation,
-  saveConstellation,
   fetchReceivedQuests,
   completeQuest,
   fetchCompletedQuests
 } from "../services/api";
 
 import { useDebounce } from "../hooks/useDebounce";
-import ConstellationCanvas from "../components/ConstellationCanvas";
 import type { Badge } from "../types/badge";
 
 interface CompletedQuest {
@@ -45,7 +42,7 @@ interface Line {
   to: string;
 }
 
-/* ===== Component ===== */
+//components
 
 export default function Profile() {
   const { user, token } = useAuth();
@@ -56,16 +53,15 @@ export default function Profile() {
   const [friends, setFriends] = useState<Friend[]>([]);
   const [received, setReceived] = useState<ReceivedQuest[]>([]);
 
-  // constellation state
+  // badge state
   const [badges, setBadges] = useState<Badge[]>([]);
   const [lines, setLines] = useState<Line[]>([]);
   const [loaded, setLoaded] = useState(false);
 
   const [completed, setCompleted] = useState<CompletedQuest[]>([]);
 
-  /* ===== Effects ===== */
 
-  // Incoming friend requests
+  // incoming friend requests
   useEffect(() => {
     if (!token) return;
     getIncomingRequests(token).then(setRequests);
@@ -76,70 +72,42 @@ export default function Profile() {
     fetchCompletedQuests(token).then(setCompleted);
   }, [token]);
 
-  // Friends list
+  // friends list
   useEffect(() => {
     if (!token) return;
     getFriends(token).then(setFriends);
   }, [token]);
 
-  // Load received quests
+  // load received quests
   useEffect(() => {
     if (!token) return;
     fetchReceivedQuests(token).then(setReceived);
   }, [token]);
 
-  // Load constellation
-  useEffect(() => {
-    if (!token) return;
-
-    loadConstellation(token).then((data) => {
-      setBadges(data.badges || []);
-      setLines(data.lines || []);
-      setLoaded(true);
-    });
-  }, [token]);
-
-  // Persist constellation (debounced)
-  useDebounce(
-    () => {
-      if (!token || !loaded) return;
-
-      saveConstellation(token, {
-        badges,
-        lines,
-      });
-    },
-    [badges, lines],
-    600
-  );
+  //load badges here NOT IMPLEMENTED TODO
 
   if (!user) {
     return <p>Not logged in</p>;
   }
 
-  /* ===== Render ===== */
+  //rendering
 
   return (
     <div style={{ padding: 24 }}>
       <h2>@{user.username}</h2>
 
-      {/* ===== Constellation ===== */}
-      <h3>Your Constellation</h3>
-      <ConstellationCanvas
-        badges={badges}
-        lines={lines}
-        setBadges={setBadges}
-        setLines={setLines}
-      />
+      {/* completed quests */}
+      <h3>Your Completed Quests</h3>
+      
 
-      {/* ===== Friends ===== */}
+      {/* friends */}
       <h3 style={{ marginTop: 24 }}>Friends</h3>
       {friends.length === 0 && <p>No friends yet</p>}
       {friends.map((f) => (
         <div key={f.id}>@{f.username}</div>
       ))}
 
-      {/* ===== Received Quests ===== */}
+      {/* recieved quests */}
       <h3 style={{ marginTop: 24 }}>Received Quests</h3>
       {received.length === 0 && <p>No active quests</p>}
 
@@ -165,17 +133,8 @@ export default function Profile() {
               // remove quest from received list
               setReceived((r) => r.filter((x) => x.id !== q.id));
 
-              // add badge to constellation
-              setBadges((b) => [
-                ...b,
-                {
-                  id: completed.quest_id,
-                  icon: completed.icon,
-                  x: 100 + Math.random() * 200,
-                  y: 100 + Math.random() * 200,
-                  size: 48,
-                },
-              ]);
+              // add badge to completed badges TODO NOT IMPLEMENTED
+        
             }}
           >
             Mark Completed
@@ -183,26 +142,7 @@ export default function Profile() {
         </div>
       ))}
 
-      {/* ===== Completed Quests ===== */}
-    <h3 style={{ marginTop: 24 }}>Completed Quests</h3>
-
-    {completed.length === 0 && <p>No completed quests yet</p>}
-
-    {completed.map((q) => (
-      <div
-        key={q.id}
-        style={{
-          background: "var(--panel)",
-          padding: 12,
-          borderRadius: 8,
-          marginBottom: 8,
-        }}
-      >
-        <span style={{ fontSize: 20 }}>{q.icon}</span> {q.title}
-      </div>
-    ))}
-
-      {/* ===== Add Friend ===== */}
+      {/* add friend */}
       <h3 style={{ marginTop: 24 }}>Add Friend</h3>
       <input
         placeholder="username"
@@ -219,7 +159,7 @@ export default function Profile() {
         Send Request
       </button>
 
-      {/* ===== Incoming Friend Requests ===== */}
+      {/* incoming friend reqs */}
       <h3 style={{ marginTop: 24 }}>Incoming Friend Requests</h3>
       {requests.length === 0 && <p>No requests</p>}
 
