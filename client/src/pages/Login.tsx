@@ -118,11 +118,8 @@ export default function Login() {
         style={{
           position: "fixed",
           top: 0,
-          left: 0,
           right: 0,
-          bottom: 0,
-          display: "grid",
-          placeItems: "center",
+          padding: "1.5rem",
           zIndex: 10,
           pointerEvents: isScrolling ? "none" : "auto",
           opacity: isScrolling ? 0 : 1,
@@ -131,32 +128,21 @@ export default function Login() {
         }}
       >
         <div className="login-form">
-          <h2>Login / Signup</h2>
-
           <input
             placeholder="username"
             value={username}
             onChange={(e) => setUsername(e.target.value)}
           />
-          <br />
           <input
             placeholder="password"
             type="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
           />
-          <br />
-
-          <button onClick={handleLogin}>
-            Login
-          </button>
-
-          <button
-            className="secondary"
-            onClick={handleSignup}
-          >
-            Signup
-          </button>
+          <div className="login-buttons">
+            <button onClick={handleLogin}>Login</button>
+            <button className="secondary" onClick={handleSignup}>Signup</button>
+          </div>
         </div>
       </div>
       
