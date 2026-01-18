@@ -35,10 +35,13 @@ export default function Home() {
   }
 
   return (
-    <div style={{ padding: 24, backgroundColor: "#000000", minHeight: "100vh" }}>
+    <div style={{ padding: 24, paddingRight: 48, backgroundColor: "#000000", minHeight: "100vh" }}>
       <div style={{ display: "flex", justifyContent: "space-between" }}>
-        <h2>Trending Sidequests</h2>
-        <button onClick={() => setShowModal(true)}>+ New Quest</button>
+        <h2>Trending Quests</h2>
+        <button onClick={() => setShowModal(true)} style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+          <img src="/images/compass.svg" alt="" width={40} height={40} />
+          Add Quest
+        </button>
       </div>
 
       {quests.map((q) => (

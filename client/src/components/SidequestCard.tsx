@@ -37,7 +37,7 @@ export default function SidequestCard({
 
       <button
         className="secondary"
-        style={{ marginLeft: 12 }}
+        style={{ marginLeft: 12, display: "flex", alignItems: "center", gap: "0.5rem" }}
         onClick={() => onShare(quest.id)}
       >
         Share
