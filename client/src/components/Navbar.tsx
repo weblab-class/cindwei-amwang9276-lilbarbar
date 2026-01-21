@@ -45,6 +45,7 @@ export default function Navbar() {
       <nav style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
         <Link
           to="/home"
+          className="float-bob"
           style={{
             display: "flex",
             alignItems: "center",
@@ -53,6 +54,7 @@ export default function Navbar() {
             color: "var(--text)",
             padding: "0.5rem",
             borderRadius: "4px",
+            animationDelay: "1s",
           }}
         >
           <img src="/images/map.svg" alt="" width={40} height={40} />
@@ -61,6 +63,7 @@ export default function Navbar() {
 
         <Link
           to="/profile"
+          className="float-bob"
           style={{
             display: "flex",
             alignItems: "center",
@@ -69,6 +72,7 @@ export default function Navbar() {
             color: "var(--text)",
             padding: "0.5rem",
             borderRadius: "4px",
+            animationDelay: "1.5s",
           }}
         >
           <img src="/images/chest.svg" alt="" width={40} height={40} />

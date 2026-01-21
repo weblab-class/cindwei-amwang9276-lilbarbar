@@ -5,6 +5,7 @@ import SubmitQuestModal from "../components/SubmitQuestModal";
 import ShareQuestModal from "../components/ShareQuestModal";
 import { fetchQuests, createQuest, voteQuest } from "../services/api";
 import { useAuth } from "../context/AuthContext";
+import LiquidEther from "../components/LiquidEther";
 
 
 
@@ -35,8 +36,37 @@ export default function Home() {
   }
 
   return (
-    <div style={{ padding: 24, paddingRight: 48, backgroundColor: "#000000", minHeight: "100vh" }}>
-      <div style={{ display: "flex", justifyContent: "space-between" }}>
+    <div style={{ padding: 24, paddingRight: 48, backgroundColor: "#000000", minHeight: "100vh", position: "relative" }}>
+      {/* react bit liquid background */}
+      <div style={{ 
+        width: '100vw', 
+        height: '100vh', 
+        position: 'fixed', 
+        top: 0, 
+        left: '200px', 
+        zIndex: 0,
+        pointerEvents: 'none',
+        overflow: 'hidden',
+      }}>
+        <div style={{ width: '1080px', height: '1080px', position: 'relative' }}>
+          <LiquidEther
+            mouseForce={5}
+            cursorSize={170}
+            isViscous
+            viscous={90}
+            colors={["#5837a4","#2f54ca","#00ffee"]}
+            autoDemo
+            autoSpeed={0.5}
+            autoIntensity={2.2}
+            isBounce={false}
+            resolution={0.5}
+          />
+        </div>
+      </div>
+      
+      {/* content */}
+      <div style={{ position: "relative", zIndex: 1 }}>
+        <div style={{ display: "flex", justifyContent: "space-between" }}>
         <h2>Trending Quests</h2>
         <button onClick={() => setShowModal(true)} style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
           <img src="/images/compass.svg" alt="" width={40} height={40} />
@@ -44,12 +74,13 @@ export default function Home() {
         </button>
       </div>
 
-      {quests.map((q) => (
+      {quests.map((q, index) => (
         <SidequestCard
           key={q.id}
           quest={q}
           onVote={handleVote}
           onShare={() => setShareQuestId(q.id)}
+          index={index}
         />
       ))}
       {shareQuestId && (
@@ -65,6 +96,7 @@ export default function Home() {
           onSubmit={(q) => handleSubmit(q.title, q.icon)}
         />
       )}
+      </div>
     </div>
   );
 }

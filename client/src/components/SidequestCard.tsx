@@ -5,15 +5,20 @@ interface Props {
   quest: Sidequest;
   onVote: (id: string, delta: number) => void;
   onShare: (id: string) => void;
+  index?: number;
 }
 
 export default function SidequestCard({
   quest,
   onVote,
   onShare,
+  index = 0,
 }: Props) {
+  const animationDelay = `${(index % 8) * 0.5}s`;
+  
   return (
     <div
+      className="float-bob"
       style={{
         display: "flex",
         alignItems: "center",
@@ -21,6 +26,7 @@ export default function SidequestCard({
         background: "var(--panel)",
         borderRadius: 12,
         marginBottom: 12,
+        animationDelay: animationDelay,
       }}
     >
       <div style={{ fontSize: 28, marginRight: 16 }}>{quest.icon}</div>
