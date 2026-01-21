@@ -1,0 +1,87 @@
+.login-container {
+  position: relative;
+}
+
+.login-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  min-width: 200px;
+}
+
+.login-form input {
+  padding: 0.5rem;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  background: rgba(0, 0, 0, 0.3);
+  color: white;
+  font-size: 0.875rem;
+  font-family: 'Courier New', monospace;
+  image-rendering: pixelated;
+  -webkit-font-smoothing: none;
+  -moz-osx-font-smoothing: unset;
+  font-smooth: never;
+  text-rendering: optimizeSpeed;
+}
+
+.login-form input::placeholder {
+  color: rgba(255, 255, 255, 0.5);
+  font-family: 'Courier New', monospace;
+}
+
+.login-form input:focus {
+  outline: none;
+  border-color: rgba(255, 255, 255, 0.6);
+}
+
+.login-buttons {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.25rem;
+}
+
+.login-form button {
+  padding: 0.5rem 1rem;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  background: rgba(0, 0, 0, 0.3);
+  color: white;
+  font-size: 0.875rem;
+  font-family: 'Courier New', monospace;
+  cursor: pointer;
+  image-rendering: pixelated;
+  -webkit-font-smoothing: none;
+  -moz-osx-font-smoothing: unset;
+  font-smooth: never;
+  text-rendering: optimizeSpeed;
+  transition: background 0.1s;
+}
+
+.login-form button:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.login-form button.secondary {
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.login-form button.secondary:hover {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.ocean-background {
+  will-change: transform;
+}
+
+.home-transition {
+  will-change: transform;
+  transform: translateY(100%);
+  animation: slideUp 1s ease-out forwards;
+}
+
+@keyframes slideUp {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
