@@ -5,6 +5,9 @@ import Home from "./Home";
 import Navbar from "../components/Navbar";
 import "./Login.css";
 
+const [signupMessage, setSignupMessage] = useState("");
+
+
 //ease in and out functions
 
 const easeInOutCubic = (t: number) =>
@@ -199,6 +202,7 @@ export default function Login() {
   };
 
   const handleSignup = async () => {
+    setSignupMessage("signup successful");
     await signup(username, password);
     await handleScrollTransition();
   };
@@ -275,6 +279,19 @@ export default function Login() {
           <div className="login-buttons">
             <button onClick={handleLogin}>Login</button>
             <button className="secondary" onClick={handleSignup}>Signup</button>
+
+            {signupMessage && (
+              <div
+                style={{
+                  marginTop: "0.5rem",
+                  fontSize: "0.9rem",
+                  color: "#a7ffd3", // mint green glow vibe
+                  textAlign: "center",
+                }}
+              >
+                {signupMessage}
+              </div>
+            )}
           </div>
         </div>
       </div>
