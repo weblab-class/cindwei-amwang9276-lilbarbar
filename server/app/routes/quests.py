@@ -109,3 +109,26 @@ def get_received_quests(
 
     return quests
 
+
+@router.get("/completed")
+def get_completed_quests(
+    db: Session = Depends(get_db),
+    user_id: str = Depends(get_current_user_id),
+):
+    """
+    Return all quests that the current user has completed, including their icons and titles.
+    """
+    cqs = db.query(CompletedQuest).filter(CompletedQuest.user_id == user_id).all()
+    results = []
+    for cq in cqs:
+        q = db.get(Quest, cq.quest_id)
+        if q:
+            results.append(
+                {
+                    "id": cq.id,
+                    "title": q.title,
+                    "icon": q.icon,
+                }
+            )
+    return results
+
