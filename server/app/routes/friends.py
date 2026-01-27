@@ -87,7 +87,11 @@ def incoming_requests(
         {
             "id": r.id,
             "from_user_id": r.from_user_id,
-            "from_username": user_map.get(r.from_user_id),
+            "from_username": (
+                db.get(User, r.from_user_id).username
+                if db.get(User, r.from_user_id)
+                else None
+            ),
         }
         for r in requests
     ]
