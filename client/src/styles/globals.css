@@ -84,5 +84,5 @@ input {
 }
 
 .page-fade-in {
-  animation: pageFadeIn 0.8s ease forwards;
+  animation: pageFadeIn 1s ease forwards;
 }

@@ -3,16 +3,10 @@ import { useAuth } from "../context/AuthContext";
 import { useNavigate } from "react-router-dom";
 import "./Login.css";
 
-//ease in and out functions
-
 const easeInOutCubic = (t: number) =>
-  t < 0.5
-    ? 4 * t * t * t
-    : 1 - Math.pow(-2 * t + 2, 3) / 2;
+  t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
 
 const easeInCubic = (t: number) => t * t * t;
-
-//animate the scrolling
 
 const animateScroll = (
   element: HTMLElement,
@@ -41,14 +35,10 @@ const animateScroll = (
     requestAnimationFrame(step);
   });
 
-//noise function
-
 const noise = (t: number) =>
   Math.sin(t * 0.7) * 0.6 +
   Math.sin(t * 1.3) * 0.3 +
   Math.sin(t * 2.1) * 0.1;
-
-//components
 
 export default function Login() {
   const { login, signup } = useAuth();
@@ -68,7 +58,6 @@ export default function Login() {
   const shipRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
-  // lock user scrolling until after successful login/signup (animation still scrolls)
   useEffect(() => {
     if (!isScrollLocked) return;
 
@@ -90,7 +79,6 @@ export default function Login() {
       if (keysToBlock.includes(e.key)) e.preventDefault();
     };
 
-    // ensure we're at the top while locked
     if (containerRef.current) containerRef.current.scrollTop = 0;
 
     window.addEventListener("wheel", preventScroll, { passive: false });
@@ -105,8 +93,6 @@ export default function Login() {
     };
   }, [isScrollLocked]);
 
-  //set image heights
-
   useEffect(() => {
     const img = new Image();
     img.src = "/images/ocean-cross-section.png";
@@ -117,9 +103,6 @@ export default function Login() {
         Math.max(min, Math.min(max, n));
 
       const computeOceanShiftPx = () => {
-        // Tweak these to taste:
-        // - shiftFactor: how much the image moves as screen height changes
-        // - baselineH: the "neutral" height where shift ~ 0
         const shiftFactor = 0.2;
         const baselineH = 800;
         return clamp(Math.round((window.innerHeight - baselineH) * shiftFactor), -220, 220);
@@ -136,8 +119,6 @@ export default function Login() {
       return () => window.removeEventListener("resize", recalc);
     };
   }, []);
-
-  //animate the ship
 
   useEffect(() => {
     let raf: number;
@@ -195,7 +176,6 @@ export default function Login() {
     const animate = (time: number) => {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-      // ambient ship ripple
       if (time - lastSpawn > 2500 + Math.random() * 2000) {
         spawnRipple(window.innerWidth / 2, window.innerHeight * 0.18);
         lastSpawn = time;
@@ -241,7 +221,6 @@ export default function Login() {
   }, []);
 
   //scroll transition to home
-
   const handleScrollTransition = async () => {
     if (!containerRef.current) return;
 
@@ -253,37 +232,25 @@ export default function Login() {
     const max = el.scrollHeight - el.clientHeight;
 
     await animateScroll(el, 0, max * 0.78, 6000, easeInOutCubic);
-    // Phase 2 scroll speed (smaller = faster, larger = slower)
-    const phase2DurationMs = 1500;
-    const fadeDurationMs = 1000; // keep in sync with CSS fadeIn/fadeOut durations
-    const fadeDelayMs = 1000; // adjust this to control when fade starts
+    const phase2DurationMs = 2000;
+    const fadeDelayMs = 1000;
 
     await animateScroll(el, max * 0.78, max, phase2DurationMs, easeInCubic, () => {
-      // Delay fade slightly (still during phase 2 scroll)
       window.setTimeout(() => {
         setIsFadingToHome(true);
         setShowHomeTransition(true);
       }, fadeDelayMs);
     });
 
-    // If fade starts late, wait so both login fade-out and home fade-in are visible
-    const postScrollWaitMs = Math.max(
-      0,
-      fadeDelayMs + fadeDurationMs - phase2DurationMs
-    );
-    if (postScrollWaitMs > 0) {
-      await new Promise((r) => setTimeout(r, postScrollWaitMs));
-    }
     navigate("/home");
   };
 
   //login authentication 
-
   const handleLogin = async () => {
     const u = username.trim();
     const p = password.trim();
     if (!u || !p) {
-      setErrorMessage("Please enter a username/password.");
+      setErrorMessage("Please enter a username/password");
       return;
     }
     setErrorMessage(null);
@@ -299,16 +266,23 @@ export default function Login() {
     const u = username.trim();
     const p = password.trim();
     if (!u || !p) {
-      setErrorMessage("Please enter a username/password.");
+      setErrorMessage("Please enter a username/password");
       return;
     }
     setErrorMessage(null);
-    await signup(username, password);
-    await handleScrollTransition();
+    try {
+      await signup(username, password);
+      await handleScrollTransition();
+    } catch (e) {
+      if (e instanceof Error && e.message === "USERNAME_TAKEN") {
+        setErrorMessage("That username already exists");
+      } else {
+        setErrorMessage("Signup failed");
+      }
+    }
   };
 
   //rendering
-
   return (
     <div
       ref={containerRef}
@@ -342,7 +316,7 @@ export default function Login() {
             style={{
               position: "absolute",
               left: "41%",
-              top: "calc(15vh + 350px)",
+              top: "calc(15vh + 320px)",
               zIndex: 3,
               pointerEvents: "none",
               willChange: "transform",
@@ -352,7 +326,6 @@ export default function Login() {
           </div>
         </div>
 
-        {/* extra scroll room so the ocean image can scroll completely off-screen */}
         <div className="ocean-spacer" />
 
         {/* login ui */}

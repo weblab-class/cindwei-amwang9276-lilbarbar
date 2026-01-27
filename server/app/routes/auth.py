@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from ..database import SessionLocal
 from ..models import User
@@ -16,12 +17,18 @@ def get_db():
 
 @router.post("/signup")
 def signup(data: UserCreate, db: Session = Depends(get_db)):
-    user = User(
-        username=data.username,
-        password=hash_password(data.password)
-    )
+    existing = db.query(User).filter(User.username == data.username).first()
+    if existing:
+        raise HTTPException(status_code=400, detail="USERNAME_TAKEN")
+
+    user = User(username=data.username, password=hash_password(data.password))
     db.add(user)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        # Handle race condition where username was taken after the check.
+        raise HTTPException(status_code=400, detail="USERNAME_TAKEN")
     db.refresh(user)
 
     return {
