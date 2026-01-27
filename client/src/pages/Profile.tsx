@@ -7,9 +7,11 @@ import {
   getFriends,
   fetchReceivedQuests,
   completeQuest,
-  fetchCompletedQuests
+  fetchCompletedQuests,
+  uploadPost,
 } from "../services/api";
 import LiquidEther from "../components/LiquidEther";
+import PostModal from "../components/PostModal";
 
 interface CompletedQuest {
   id: string;
@@ -42,6 +44,7 @@ export default function Profile() {
   const { user, token } = useAuth();
 
   const row1HeightPx = 350;
+  const [showPostModal, setShowPostModal] = useState(false);
 
   const [username, setUsername] = useState("");
 
@@ -86,6 +89,13 @@ export default function Profile() {
   }
 
   //rendering
+
+  async function handleUpload(file: File, questId: string) {
+    if (!token) {
+      throw new Error("Missing credentials");
+    }
+    await uploadPost(token, file, questId);
+  }
 
   return (
     <div style={{ padding: 24, backgroundColor: "#000000", minHeight: "100vh", position: "relative" }}>
@@ -267,41 +277,51 @@ export default function Profile() {
               <h3 style={{ marginTop: 0 }}>Received Quests</h3>
               {received.length === 0 && <p>No active quests</p>}
 
-              {received.map((q) => (
-                <div
-                  key={q.id}
-                  style={{
-                    background: "var(--panel)",
-                    padding: 12,
-                    borderRadius: 8,
-                    marginBottom: 8,
-                  }}
-                >
-                  <span style={{ fontSize: 20 }}>{q.icon}</span> {q.title}
-
-                  <button
-                    style={{ marginLeft: 12 }}
-                    onClick={async () => {
-                      if (!token) return;
-                      await completeQuest(token, q.id);
-                      setReceived((r) => r.filter((x) => x.id !== q.id));
+              <div
+                className="themed-scrollbar"
+                style={{
+                  height: 150,
+                  overflowY: "auto",
+                  paddingRight: 6,
+                }}
+              >
+                {received.map((q) => (
+                  <div
+                    key={q.id}
+                    style={{
+                      background: "var(--panel)",
+                      padding: 12,
+                      borderRadius: 8,
+                      marginBottom: 8,
                     }}
                   >
-                    Mark Completed
-                  </button>
-                </div>
-              ))}
+                    <span style={{ fontSize: 20 }}>{q.icon}</span> {q.title}
+
+                    <button
+                      style={{ marginLeft: 12 }}
+                      onClick={async () => {
+                        if (!token) return;
+                        await completeQuest(token, q.id);
+                        setReceived((r) => r.filter((x) => x.id !== q.id));
+                      }}
+                    >
+                      Mark Completed
+                    </button>
+                  </div>
+                ))}
+              </div>
             </div>
 
             {/* FULL WIDTH: completed quests */}
             <div style={{ gridColumn: "1 / -1" }}>
-              <h3 style={{ marginTop: 8 }}>Your Completed Quests</h3>
+              <h3 style={{ marginTop: 4 }}>Your Completed Quests</h3>
               {completed.length === 0 && (
                 <div
                   style={{
                     width: "100%",
                     minHeight: "35vh",
                     display: "flex",
+                    flexDirection: "column",
                     alignItems: "center",
                     justifyContent: "center",
                     textAlign: "center",
@@ -309,7 +329,20 @@ export default function Profile() {
                     padding: "24px 12px",
                   }}
                 >
-                  No completed quests yet, add your first to your quest chest!
+                  <div>No completed quests yet, add your first to your quest chest!</div>
+
+                  <button
+                    onClick={() => setShowPostModal(true)}
+                    style={{
+                      marginTop: 16,
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: "0.5rem",
+                    }}
+                  >
+                    <span>📸</span>
+                    Post
+                  </button>
                 </div>
               )}
               {completed.map((c) => (
@@ -319,6 +352,13 @@ export default function Profile() {
           </div>
         </div>
       </div>
+
+      {showPostModal && (
+        <PostModal
+          onClose={() => setShowPostModal(false)}
+          onSubmit={handleUpload}
+        />
+      )}
     </div>
   );
 }
