@@ -19,7 +19,7 @@ export default function PostModal({ onClose, onSubmit }: Props) {
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    fetchQuests().then(setQuests);
+    fetchQuests(token ?? undefined).then(setQuests);
   }, []);
 
   useEffect(() => {

@@ -6,5 +6,6 @@ export interface Post {
   media_url: string;
   media_type: 'image' | 'video';
   votes: number;
+  my_vote?: -1 | 0 | 1;
   created_at?: string;
 }

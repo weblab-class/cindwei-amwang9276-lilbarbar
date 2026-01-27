@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import LiquidEther from "../components/LiquidEther";
 import PostModal from "../components/PostModal";
 import PostCard from "../components/PostCard";
@@ -7,6 +7,8 @@ import { useAuth } from "../context/AuthContext";
 import type { Post } from "../types/post";
 import type { Comment } from "../types/comment";
 
+type Vote = -1 | 0 | 1;
+
 export default function Home() {
   const { token } = useAuth();
   const [posts, setPosts] = useState<Post[]>([]);
@@ -14,17 +16,12 @@ export default function Home() {
   const [selectedPost, setSelectedPost] = useState<Post | null>(null);
   const [comments, setComments] = useState<Comment[]>([]);
   const [newComment, setNewComment] = useState("");
+  const [myVotes, setMyVotes] = useState<Record<string, Vote>>({});
 
-  useEffect(() => {
-    if (token) {
-      loadPosts();
-    }
-  }, [token]);
-
-  async function loadPosts() {
+  const loadPosts = useCallback(async () => {
     if (!token) return;
     try {
-      const allPosts = await fetchPosts(token);
+      const allPosts = (await fetchPosts(token)) as Post[];
       
       // Get top 5 most upvoted posts
       const topPosts = [...allPosts]
@@ -42,10 +39,25 @@ export default function Home() {
       // Combine: top 5 + random 5 (or less if not enough posts)
       const displayPosts = [...topPosts, ...randomPosts].slice(0, 10);
       setPosts(displayPosts);
+      setMyVotes(() => {
+        const next: Record<string, Vote> = {};
+        for (const p of displayPosts) {
+          next[p.id] = (p.my_vote ?? 0) as Vote;
+        }
+        return next;
+      });
     } catch (error) {
       console.error("Failed to load posts:", error);
     }
-  }
+  }, [token]);
+
+  useEffect(() => {
+    // Defer to avoid synchronous setState within effect body (eslint rule)
+    const t = window.setTimeout(() => {
+      void loadPosts();
+    }, 0);
+    return () => window.clearTimeout(t);
+  }, [loadPosts]);
 
   async function handleUpload(file: File, questId: string) {
     if (!token) {
@@ -55,8 +67,15 @@ export default function Home() {
     await loadPosts();
   }
 
-  async function handleVote(postId: string, delta: number) {
+  async function handleVote(postId: string, direction: 1 | -1) {
     if (!token) return;
+    const prevVote: Vote = myVotes[postId] ?? 0;
+    const nextVote: Vote = prevVote === direction ? 0 : direction;
+    const delta = nextVote - prevVote; // -2, -1, +1, +2
+    if (delta === 0) return;
+
+    // optimistic UI update
+    setMyVotes((prev) => ({ ...prev, [postId]: nextVote }));
     try {
       await votePost(token, postId, delta);
       // Update local state
@@ -71,6 +90,8 @@ export default function Home() {
       );
     } catch (error) {
       console.error("Failed to vote:", error);
+      // rollback optimistic vote state if request failed
+      setMyVotes((prev) => ({ ...prev, [postId]: prevVote }));
     }
   }
 
@@ -158,6 +179,7 @@ export default function Home() {
               <PostCard
                 key={post.id}
                 post={post}
+                myVote={myVotes[post.id] ?? 0}
                 onVote={handleVote}
                 onOpen={async () => {
                   setSelectedPost(post);
@@ -321,11 +343,20 @@ export default function Home() {
                     }}
                   >
                     <button
-                      onClick={() => handleVote(selectedPost.id, 1)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        void handleVote(selectedPost.id, 1);
+                      }}
                       style={{
-                        background: "transparent",
+                        background:
+                          (myVotes[selectedPost.id] ?? 0) === 1
+                            ? "var(--mint)"
+                            : "transparent",
                         border: "1px solid var(--mint)",
-                        color: "var(--mint)",
+                        color:
+                          (myVotes[selectedPost.id] ?? 0) === 1
+                            ? "#000"
+                            : "var(--mint)",
                         padding: "4px 10px",
                         borderRadius: 999,
                         cursor: "pointer",
@@ -344,11 +375,20 @@ export default function Home() {
                       {selectedPost.votes}
                     </span>
                     <button
-                      onClick={() => handleVote(selectedPost.id, -1)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        void handleVote(selectedPost.id, -1);
+                      }}
                       style={{
-                        background: "transparent",
+                        background:
+                          (myVotes[selectedPost.id] ?? 0) === -1
+                            ? "var(--mint)"
+                            : "transparent",
                         border: "1px solid var(--mint)",
-                        color: "var(--mint)",
+                        color:
+                          (myVotes[selectedPost.id] ?? 0) === -1
+                            ? "#000"
+                            : "var(--mint)",
                         padding: "4px 10px",
                         borderRadius: 999,
                         cursor: "pointer",

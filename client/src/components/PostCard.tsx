@@ -1,16 +1,22 @@
 import { useState, useRef } from "react";
 import type { Post } from "../types/post";
 
+type Vote = -1 | 0 | 1;
+
 interface Props {
   post: Post;
-  onVote: (postId: string, delta: number) => void;
+  myVote?: Vote;
+  onVote: (postId: string, direction: 1 | -1) => void;
   onOpen?: () => void;
 }
 
-export default function PostCard({ post, onVote, onOpen }: Props) {
+export default function PostCard({ post, myVote = 0, onVote, onOpen }: Props) {
   const [imageLoaded, setImageLoaded] = useState(false);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const [isHovered, setIsHovered] = useState(false);
+
+  const upActive = myVote === 1;
+  const downActive = myVote === -1;
 
   return (
     <div
@@ -55,11 +61,14 @@ export default function PostCard({ post, onVote, onOpen }: Props) {
           }}
         >
           <button
-            onClick={() => onVote(post.id, 1)}
+            onClick={(e) => {
+              e.stopPropagation();
+              onVote(post.id, 1);
+            }}
             style={{
-              background: "rgba(0,0,0,0.6)",
-              border: "1px solid var(--mint)",
-              color: "var(--mint)",
+              background: upActive ? "var(--mint)" : "rgba(0,0,0,0.6)",
+              border: upActive ? "1px solid var(--mint)" : "1px solid var(--mint)",
+              color: upActive ? "#000" : "var(--mint)",
               padding: "2px 8px",
               borderRadius: 999,
               cursor: "pointer",
@@ -79,11 +88,14 @@ export default function PostCard({ post, onVote, onOpen }: Props) {
             {post.votes}
           </span>
           <button
-            onClick={() => onVote(post.id, -1)}
+            onClick={(e) => {
+              e.stopPropagation();
+              onVote(post.id, -1);
+            }}
             style={{
-              background: "rgba(0,0,0,0.6)",
-              border: "1px solid var(--mint)",
-              color: "var(--mint)",
+              background: downActive ? "var(--mint)" : "rgba(0,0,0,0.6)",
+              border: downActive ? "1px solid var(--mint)" : "1px solid var(--mint)",
+              color: downActive ? "#000" : "var(--mint)",
               padding: "2px 8px",
               borderRadius: 999,
               cursor: "pointer",

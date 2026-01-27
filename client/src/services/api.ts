@@ -1,7 +1,12 @@
 const API = import.meta.env.VITE_API_URL;
 
-export async function fetchQuests() {
-  const res = await fetch(`${API}/quests`);
+export async function fetchQuests(token?: string) {
+  const res = await fetch(
+    token ? `${API}/quests/with_votes` : `${API}/quests`,
+    token
+      ? { headers: { Authorization: `Bearer ${token}` } }
+      : undefined
+  );
   return res.json();
 }
 

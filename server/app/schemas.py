@@ -27,6 +27,10 @@ class QuestOut(BaseModel):
     votes: int
 
 
+class QuestOutWithVote(QuestOut):
+    my_vote: int = 0
+
+
 class PostCreate(BaseModel):
     quest_id: str
     media_url: str
@@ -41,6 +45,8 @@ class PostOut(BaseModel):
     votes: int
     quest_title: str | None = None
     quest_icon: str | None = None
+    # Current user's vote on this post: -1, 0, 1
+    my_vote: int = 0
 
 
 class CommentCreate(BaseModel):

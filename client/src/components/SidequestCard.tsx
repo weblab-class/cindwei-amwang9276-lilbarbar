@@ -3,13 +3,15 @@ import VoteButtons from "./VoteButtons";
 
 interface Props {
   quest: Sidequest;
-  onVote: (id: string, delta: number) => void;
+  myVote?: -1 | 0 | 1;
+  onVote: (id: string, direction: 1 | -1) => void;
   onShare: (id: string) => void;
   index?: number;
 }
 
 export default function SidequestCard({
   quest,
+  myVote = 0,
   onVote,
   onShare,
   index = 0,
@@ -37,7 +39,8 @@ export default function SidequestCard({
 
       <VoteButtons
         votes={quest.votes}
-        onUpvote={() => onVote(quest.id, +1)}
+        myVote={myVote}
+        onUpvote={() => onVote(quest.id, 1)}
         onDownvote={() => onVote(quest.id, -1)}
       />
 
