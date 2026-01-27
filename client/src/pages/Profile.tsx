@@ -329,88 +329,6 @@ export default function Profile() {
                   <h2 style={{ marginTop: 0, marginBottom: 0, textAlign: "center" }}>
                     @{profileUsername}
                   </h2>
-
-                  {/* Quest badges under avatar */}
-                  <div style={{ marginTop: 16 }}>
-                    <h3
-                      style={{
-                        margin: 0,
-                        marginBottom: 8,
-                        fontSize: "0.95rem",
-                        textTransform: "uppercase",
-                        letterSpacing: "0.08em",
-                        color: "rgba(200,200,200,0.9)",
-                      }}
-                    >
-                      Quest Badges
-                    </h3>
-                    {completed.length === 0 ? (
-                      <p
-                        style={{
-                          margin: 0,
-                          fontSize: "0.85rem",
-                          color: "rgba(160,160,160,0.9)",
-                        }}
-                      >
-                        You have no badges yet. Complete shared quests to earn them.
-                      </p>
-                    ) : (
-                      <div
-                        style={{
-                          display: "flex",
-                          flexWrap: "wrap",
-                          gap: 8,
-                          justifyContent: "center",
-                          marginTop: 4,
-                        }}
-                      >
-                        {completed.map((c) => (
-                          <div
-                            key={c.id}
-                            style={{
-                              position: "relative",
-                              display: "inline-flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                            }}
-                            onMouseEnter={() => setHoveredBadgeId(c.id)}
-                            onMouseLeave={() => setHoveredBadgeId(null)}
-                          >
-                            <span
-                              style={{
-                                fontSize: "1.8rem",
-                                filter: "drop-shadow(0 0 6px rgba(0,0,0,0.6))",
-                                cursor: "default",
-                              }}
-                            >
-                              {c.icon}
-                            </span>
-                            {hoveredBadgeId === c.id && (
-                              <div
-                                style={{
-                                  position: "absolute",
-                                  top: "120%",
-                                  left: "50%",
-                                  transform: "translateX(-50%)",
-                                  whiteSpace: "nowrap",
-                                  background: "rgba(0, 0, 0, 0.85)",
-                                  color: "rgba(255, 255, 255, 0.95)",
-                                  padding: "4px 8px",
-                                  borderRadius: 6,
-                                  fontSize: "0.75rem",
-                                  boxShadow: "0 4px 12px rgba(0,0,0,0.6)",
-                                  pointerEvents: "none",
-                                  zIndex: 10,
-                                }}
-                              >
-                                {c.title}
-                              </div>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
                 </div>
               </div>
             </div>
@@ -503,9 +421,74 @@ export default function Profile() {
             </div>
 
             {/* ROW 2 (left): quest badges */}
-            <div>
+            <div>            
               <h3 style={{ marginTop: 0 }}>Quest Badges</h3>
-              <p style={{ color: "rgba(180, 180, 180, 0.9)" }}>You have no badges</p>
+                {completed.length === 0 ? (
+                  <p
+                    style={{
+                      margin: 0,
+                      fontSize: "0.85rem",
+                      color: "rgba(160,160,160,0.9)",
+                    }}
+                  >
+                    You have no badges yet. Complete shared quests to earn them.
+                  </p>
+                ) : (
+                  <div
+                    style={{
+                      display: "flex",
+                      flexWrap: "wrap",
+                      gap: 8,
+                      justifyContent: "center",
+                      marginTop: 4,
+                    }}
+                  >
+                    {completed.map((c) => (
+                      <div
+                        key={c.id}
+                        style={{
+                          position: "relative",
+                          display: "inline-flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                        }}
+                        onMouseEnter={() => setHoveredBadgeId(c.id)}
+                        onMouseLeave={() => setHoveredBadgeId(null)}
+                      >
+                        <span
+                          style={{
+                            fontSize: "1.8rem",
+                            filter: "drop-shadow(0 0 6px rgba(0,0,0,0.6))",
+                            cursor: "default",
+                          }}
+                        >
+                          {c.icon}
+                        </span>
+                        {hoveredBadgeId === c.id && (
+                          <div
+                            style={{
+                              position: "absolute",
+                              top: "120%",
+                              left: "50%",
+                              transform: "translateX(-50%)",
+                              whiteSpace: "nowrap",
+                              background: "rgba(0, 0, 0, 0.85)",
+                              color: "rgba(255, 255, 255, 0.95)",
+                              padding: "4px 8px",
+                              borderRadius: 6,
+                              fontSize: "0.75rem",
+                              boxShadow: "0 4px 12px rgba(0,0,0,0.6)",
+                              pointerEvents: "none",
+                              zIndex: 10,
+                            }}
+                          >
+                            {c.title}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
             </div>
 
             {/* ROW 2 (right): received quests */}
