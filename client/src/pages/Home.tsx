@@ -156,7 +156,8 @@ export default function Home() {
         <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 24 }}>
           <button 
             onClick={() => setShowPostModal(true)} 
-            style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}
+            className="float-bob"
+            style={{ display: "flex", alignItems: "center", gap: "1rem", padding: "0.8em 1.6em", fontWeight: 700, fontSize: "1rem", animationDelay: "0.5s" }}
           >
             <span>📸</span>
             Post
