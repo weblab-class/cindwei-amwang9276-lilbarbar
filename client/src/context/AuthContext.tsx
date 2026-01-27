@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, ReactNode } from "react";
+import { createContext, useContext, useState, useEffect, ReactNode } from "react";
 
 interface User {
   username: string;
@@ -17,8 +17,29 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 const API = import.meta.env.VITE_API_URL;
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
-  const [token, setToken] = useState<string | null>(null);
+  const [user, setUser] = useState<User | null>(() => {
+    if (typeof window === "undefined") return null;
+    try {
+      const raw = window.localStorage.getItem("auth");
+      if (!raw) return null;
+      const parsed = JSON.parse(raw) as { user: User | null; token: string | null };
+      return parsed.user ?? null;
+    } catch {
+      return null;
+    }
+  });
+
+  const [token, setToken] = useState<string | null>(() => {
+    if (typeof window === "undefined") return null;
+    try {
+      const raw = window.localStorage.getItem("auth");
+      if (!raw) return null;
+      const parsed = JSON.parse(raw) as { user: User | null; token: string | null };
+      return parsed.token ?? null;
+    } catch {
+      return null;
+    }
+  });
 
   async function login(username: string, password: string) {
     const res = await fetch(`${API}/auth/login`, {
@@ -48,6 +69,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
     setToken(null);
   }
+
+  // keep auth state in localStorage so refreshes stay logged in
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (user && token) {
+      window.localStorage.setItem("auth", JSON.stringify({ user, token }));
+    } else {
+      window.localStorage.removeItem("auth");
+    }
+  }, [user, token]);
 
   return (
     <AuthContext.Provider value={{ user, token, login, signup, logout }}>

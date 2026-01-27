@@ -12,6 +12,7 @@ import {
 
 import { useDebounce } from "../hooks/useDebounce";
 import type { Badge } from "../types/badge";
+import LiquidEther from "../components/LiquidEther";
 
 interface CompletedQuest {
   id: string;
@@ -93,7 +94,36 @@ export default function Profile() {
   //rendering
 
   return (
-    <div style={{ padding: 24 }}>
+    <div style={{ padding: 24, backgroundColor: "#000000", minHeight: "100vh", position: "relative" }}>
+      {/* react bit liquid background */}
+      <div style={{ 
+        width: '100vw', 
+        height: '100vh', 
+        position: 'fixed', 
+        top: 0, 
+        left: '200px', 
+        zIndex: 0,
+        pointerEvents: 'none',
+        overflow: 'hidden',
+      }}>
+        <div style={{ width: '1080px', height: '1080px', position: 'relative' }}>
+          <LiquidEther
+            mouseForce={5}
+            cursorSize={170}
+            isViscous
+            viscous={90}
+            colors={["#5837a4","#2f54ca","#00ffee"]}
+            autoDemo
+            autoSpeed={0.5}
+            autoIntensity={2.2}
+            isBounce={false}
+            resolution={0.5}
+          />
+        </div>
+      </div>
+      
+      {/* content */}
+      <div style={{ position: "relative", zIndex: 1 }}>
       <h2>@{user.username}</h2>
 
       {/* completed quests */}
@@ -198,6 +228,7 @@ export default function Profile() {
           </div>
         </div>
       ))}
+      </div>
     </div>
   );
 }

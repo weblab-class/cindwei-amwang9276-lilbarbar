@@ -10,15 +10,47 @@ class UserCreate(BaseModel):
     username: str
     password: str
 
+
 class UserOut(BaseModel):
     username: str
+
 
 class QuestCreate(BaseModel):
     title: str
     icon: str
+
 
 class QuestOut(BaseModel):
     id: str
     title: str
     icon: str
     votes: int
+
+
+class PostCreate(BaseModel):
+    quest_id: str
+    media_url: str
+    media_type: str  # "image" | "video"
+
+
+class PostOut(BaseModel):
+    id: str
+    quest_id: str
+    media_url: str
+    media_type: str
+    votes: int
+    quest_title: str | None = None
+    quest_icon: str | None = None
+
+
+class CommentCreate(BaseModel):
+  content: str
+
+
+class CommentOut(BaseModel):
+  id: str
+  post_id: str
+  user_id: str
+  username: str | None = None
+  content: str
+  created_at: str | None = None

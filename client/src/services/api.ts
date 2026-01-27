@@ -133,3 +133,99 @@ export async function fetchCompletedQuests(token: string) {
 
   return res.json();
 }
+
+// Posts API
+export async function uploadPost(
+  token: string,
+  file: File,
+  questId: string
+) {
+  // Upload via backend to avoid Cloudflare CORS issues.
+  const form = new FormData();
+  form.append("file", file);
+  form.append("quest_id", questId);
+
+  const res = await fetch(`${API}/posts/upload`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+    body: form,
+  });
+
+  if (!res.ok) {
+    const txt = await res.text();
+    throw new Error(txt || "Failed to upload post");
+  }
+
+  return res.json();
+}
+
+export async function fetchPosts(token: string) {
+  const res = await fetch(`${API}/posts`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  if (!res.ok) {
+    throw new Error("Failed to fetch posts");
+  }
+
+  return res.json();
+}
+
+export async function votePost(
+  token: string,
+  postId: string,
+  delta: number
+) {
+  const res = await fetch(`${API}/posts/${postId}/vote?delta=${delta}`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  if (!res.ok) {
+    throw new Error("Failed to vote on post");
+  }
+
+  return res.json();
+}
+
+export async function fetchComments(token: string, postId: string) {
+  const res = await fetch(`${API}/posts/${postId}/comments`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  if (!res.ok) {
+    throw new Error("Failed to fetch comments");
+  }
+
+  return res.json();
+}
+
+export async function createComment(
+  token: string,
+  postId: string,
+  content: string
+) {
+  const res = await fetch(`${API}/posts/${postId}/comments`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ content }),
+  });
+
+  if (!res.ok) {
+    const txt = await res.text();
+    throw new Error(txt || "Failed to create comment");
+  }
+
+  return res.json();
+}

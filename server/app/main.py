@@ -1,8 +1,13 @@
 from dotenv import load_dotenv
+
 load_dotenv()
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+
+from .database import Base, engine
+from .routes import auth, friends, quests, share, posts
+
 
 app = FastAPI()
 
@@ -15,18 +20,14 @@ app.add_middleware(
 )
 
 
-from .database import Base, engine
-from .routes import friends
-from .routes import auth, quests,share
-
-
-
 @app.on_event("startup")
 def on_startup():
     Base.metadata.create_all(bind=engine)
+
 
 app.include_router(auth.router)
 app.include_router(quests.router)
 app.include_router(friends.router)
 app.include_router(share.router)
+app.include_router(posts.router)
 

@@ -77,7 +77,7 @@ export default function Login() {
     const start = performance.now();
 
     const animate = (time: number) => {
-      const t = (time - start) / 1000;
+      const t = ((time - start) / 1000) * 1.5; // Increased speed by 1.5x
       const y = noise(t) * 10;
       const r = noise(t + 10) * 2;
 

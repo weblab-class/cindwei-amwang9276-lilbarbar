@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { useAuth } from "./context/AuthContext";
 import Login from "./pages/Login";
 import Home from "./pages/Home";
+import Trending from "./pages/Trending";
 import Profile from "./pages/Profile";
 import Navbar from "./components/Navbar";
 
@@ -24,6 +25,20 @@ export default function App() {
                 <Navbar />
                 <div style={{ marginLeft: "200px", width: "calc(100% - 200px)" }}>
                   <Home />
+                </div>
+              </div>
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/trending"
+          element={
+            <ProtectedRoute>
+              <div style={{ display: "flex" }}>
+                <Navbar />
+                <div style={{ marginLeft: "200px", width: "calc(100% - 200px)" }}>
+                  <Trending />
                 </div>
               </div>
             </ProtectedRoute>

@@ -62,6 +62,24 @@ export default function Navbar() {
         </Link>
 
         <Link
+          to="/trending"
+          className="float-bob"
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "0.5rem",
+            textDecoration: "none",
+            color: "var(--text)",
+            padding: "0.5rem",
+            borderRadius: "4px",
+            animationDelay: "1.25s",
+          }}
+        >
+          <img src="/images/compass.svg" alt="" width={40} height={40} />
+          Trending
+        </Link>
+
+        <Link
           to="/profile"
           className="float-bob"
           style={{
