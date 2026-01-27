@@ -229,6 +229,43 @@ export default function Profile() {
       
       {/* content */}
       <div style={{ position: "relative", zIndex: 1 }}>
+      {!isOwnProfile && (
+          <div
+            style={{
+              marginBottom: 12,
+              padding: "8px 12px",
+              borderRadius: 999,
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 8,
+              background:
+                "linear-gradient(90deg, rgba(88,55,164,0.7), rgba(0,255,238,0.25))",
+              boxShadow: "0 10px 30px rgba(0,0,0,0.55)",
+              fontSize: "0.85rem",
+              color: "rgba(255,255,255,0.95)",
+            }}
+          >
+            <span
+              style={{
+                width: 18,
+                height: 18,
+                borderRadius: "50%",
+                border: "2px solid rgba(0,0,0,0.8)",
+                background: "rgba(0,0,0,0.85)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                fontSize: "0.7rem",
+              }}
+            >
+              👁
+            </span>
+            <span>
+              Viewing <strong>@{profileUsername}</strong>&apos;s profile
+            </span>
+          </div>
+        )}
+        
         <div style={{ maxWidth: 980, margin: "0 auto" }}>
           <div
             style={{
