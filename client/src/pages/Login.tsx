@@ -1,8 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { useAuth } from "../context/AuthContext";
 import { useNavigate } from "react-router-dom";
-import Home from "./Home";
-import Navbar from "../components/Navbar";
 import "./Login.css";
 
 //ease in and out functions
@@ -21,14 +19,24 @@ const animateScroll = (
   from: number,
   to: number,
   duration: number,
-  easing: (t: number) => number
+  easing: (t: number) => number,
+  onStart?: () => void
 ) =>
   new Promise<void>((resolve) => {
     const start = performance.now();
+    let started = false;
     const step = (now: number) => {
+      if (!started) {
+        started = true;
+        onStart?.();
+      }
       const t = Math.min((now - start) / duration, 1);
       element.scrollTop = from + (to - from) * easing(t);
-      t < 1 ? requestAnimationFrame(step) : resolve();
+      if (t < 1) {
+        requestAnimationFrame(step);
+      } else {
+        resolve();
+      }
     };
     requestAnimationFrame(step);
   });
@@ -48,13 +56,54 @@ export default function Login() {
 
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isScrolling, setIsScrolling] = useState(false);
   const [showHomeTransition, setShowHomeTransition] = useState(false);
   const [imageHeight, setImageHeight] = useState("400vh");
+  const [isScrollLocked, setIsScrollLocked] = useState(true);
+  const [isFadingToHome, setIsFadingToHome] = useState(false);
+  const [oceanShiftPx, setOceanShiftPx] = useState(0);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const shipRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  // lock user scrolling until after successful login/signup (animation still scrolls)
+  useEffect(() => {
+    if (!isScrollLocked) return;
+
+    const prevBodyOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    const preventScroll = (e: Event) => e.preventDefault();
+
+    const onKeyDown = (e: KeyboardEvent) => {
+      const keysToBlock = [
+        "ArrowUp",
+        "ArrowDown",
+        "PageUp",
+        "PageDown",
+        "Home",
+        "End",
+        " ",
+      ];
+      if (keysToBlock.includes(e.key)) e.preventDefault();
+    };
+
+    // ensure we're at the top while locked
+    if (containerRef.current) containerRef.current.scrollTop = 0;
+
+    window.addEventListener("wheel", preventScroll, { passive: false });
+    window.addEventListener("touchmove", preventScroll, { passive: false });
+    window.addEventListener("keydown", onKeyDown);
+
+    return () => {
+      document.body.style.overflow = prevBodyOverflow;
+      window.removeEventListener("wheel", preventScroll as EventListener);
+      window.removeEventListener("touchmove", preventScroll as EventListener);
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  }, [isScrollLocked]);
 
   //set image heights
 
@@ -62,11 +111,29 @@ export default function Login() {
     const img = new Image();
     img.src = "/images/ocean-cross-section.png";
     img.onload = () => {
-      const vh =
-        (window.innerWidth * (img.height / img.width)) /
-        window.innerHeight *
-        100;
-      setImageHeight(`${vh}vh`);
+      const aspect = img.height / img.width;
+
+      const clamp = (n: number, min: number, max: number) =>
+        Math.max(min, Math.min(max, n));
+
+      const computeOceanShiftPx = () => {
+        // Tweak these to taste:
+        // - shiftFactor: how much the image moves as screen height changes
+        // - baselineH: the "neutral" height where shift ~ 0
+        const shiftFactor = 0.2;
+        const baselineH = 800;
+        return clamp(Math.round((window.innerHeight - baselineH) * shiftFactor), -220, 220);
+      };
+
+      const recalc = () => {
+        const vh = ((window.innerWidth * aspect) / window.innerHeight) * 100;
+        setImageHeight(`${vh}vh`);
+        setOceanShiftPx(computeOceanShiftPx());
+      };
+
+      recalc();
+      window.addEventListener("resize", recalc);
+      return () => window.removeEventListener("resize", recalc);
     };
   }, []);
 
@@ -77,7 +144,7 @@ export default function Login() {
     const start = performance.now();
 
     const animate = (time: number) => {
-      const t = ((time - start) / 1000) * 1.5; // Increased speed by 1.5x
+      const t = (time - start) / 750;
       const y = noise(t) * 10;
       const r = noise(t + 10) * 2;
 
@@ -101,7 +168,8 @@ export default function Login() {
     if (!canvas) return;
 
     const ctx = canvas.getContext("2d")!;
-    const ripples: any[] = [];
+    type Ripple = { x: number; y: number; r: number; a: number; s: number };
+    const ripples: Ripple[] = [];
 
     const resize = () => {
       canvas.width = canvas.offsetWidth * devicePixelRatio;
@@ -177,28 +245,64 @@ export default function Login() {
   const handleScrollTransition = async () => {
     if (!containerRef.current) return;
 
+    setIsScrollLocked(false);
     setIsScrolling(true);
     await new Promise((r) => setTimeout(r, 400));
 
     const el = containerRef.current;
     const max = el.scrollHeight - el.clientHeight;
 
-    await animateScroll(el, 0, max * 0.9, 6000, easeInOutCubic);
-    await animateScroll(el, max * 0.9, max, 900, easeInCubic);
+    await animateScroll(el, 0, max * 0.78, 6000, easeInOutCubic);
+    // Phase 2 scroll speed (smaller = faster, larger = slower)
+    const phase2DurationMs = 1500;
+    const fadeDurationMs = 1000; // keep in sync with CSS fadeIn/fadeOut durations
+    const fadeDelayMs = 1000; // adjust this to control when fade starts
 
-    setShowHomeTransition(true);
-    await new Promise((r) => setTimeout(r, 500));
+    await animateScroll(el, max * 0.78, max, phase2DurationMs, easeInCubic, () => {
+      // Delay fade slightly (still during phase 2 scroll)
+      window.setTimeout(() => {
+        setIsFadingToHome(true);
+        setShowHomeTransition(true);
+      }, fadeDelayMs);
+    });
+
+    // If fade starts late, wait so both login fade-out and home fade-in are visible
+    const postScrollWaitMs = Math.max(
+      0,
+      fadeDelayMs + fadeDurationMs - phase2DurationMs
+    );
+    if (postScrollWaitMs > 0) {
+      await new Promise((r) => setTimeout(r, postScrollWaitMs));
+    }
     navigate("/home");
   };
 
   //login authentication 
 
   const handleLogin = async () => {
-    await login(username, password);
-    await handleScrollTransition();
+    const u = username.trim();
+    const p = password.trim();
+    if (!u || !p) {
+      setErrorMessage("Please enter a username/password.");
+      return;
+    }
+    setErrorMessage(null);
+    try {
+      await login(username, password);
+      await handleScrollTransition();
+    } catch {
+      setErrorMessage("The username/password is incorrect");
+    }
   };
 
   const handleSignup = async () => {
+    const u = username.trim();
+    const p = password.trim();
+    if (!u || !p) {
+      setErrorMessage("Please enter a username/password.");
+      return;
+    }
+    setErrorMessage(null);
     await signup(username, password);
     await handleScrollTransition();
   };
@@ -208,90 +312,102 @@ export default function Login() {
   return (
     <div
       ref={containerRef}
-      className="login-container"
-      style={{ height: "100vh", overflow: "auto", position: "relative" }}
+      className={`login-container${isScrollLocked ? " locked" : ""}`}
     >
-      <canvas
-        ref={canvasRef}
-        style={{
-          position: "fixed",
-          inset: 0,
-          pointerEvents: "none",
-          zIndex: 2,
-        }}
-      />
-
-      <div
-        className="ocean-background"
-        style={{
-          height: imageHeight,
-          backgroundImage: "url('/images/ocean-cross-section.png')",
-          backgroundSize: "100% auto",
-          backgroundRepeat: "no-repeat",
-          position: "relative",
-        }}
-      >
-        {/* ship */}
-        <div
-          ref={shipRef}
+      <div className={`login-scene${isFadingToHome ? " fading-out" : ""}`}>
+        <canvas
+          ref={canvasRef}
           style={{
-            position: "absolute",
-            left: "41%",
-            top: "calc(15vh + 400px)",
-            zIndex: 3,
+            position: "fixed",
+            inset: 0,
             pointerEvents: "none",
-            willChange: "transform",
+            zIndex: 2,
+          }}
+        />
+
+        <div
+          className="ocean-background"
+          style={{
+            height: imageHeight,
+            backgroundImage: "url('/images/ocean-cross-section.png')",
+            backgroundSize: "100% auto",
+            backgroundRepeat: "no-repeat",
+            backgroundPosition: `center ${oceanShiftPx}px`,
+            position: "relative",
           }}
         >
-          <img src="/images/ship.png" width={180} />
+          {/* ship */}
+          <div
+            ref={shipRef}
+            style={{
+              position: "absolute",
+              left: "41%",
+              top: "calc(15vh + 350px)",
+              zIndex: 3,
+              pointerEvents: "none",
+              willChange: "transform",
+            }}
+          >
+            <img src="/images/ship.png" width={180} />
+          </div>
         </div>
-      </div>
 
-      {/* login ui */}
-      <div
-        className="login-overlay"
-        style={{
-          position: "fixed",
-          top: 0,
-          right: 0,
-          padding: "1.5rem",
-          zIndex: 10,
-          opacity: isScrolling ? 0 : 1,
-          transition: "opacity 0.5s",
-        }}
-      >
-        <div className="login-form">
-          <input
-            placeholder="username"
-            value={username}
-            onChange={(e) => setUsername(e.target.value)}
-          />
-          <input
-            placeholder="password"
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-          />
-          <div className="login-buttons">
-            <button onClick={handleLogin}>Login</button>
-            <button className="secondary" onClick={handleSignup}>Signup</button>
+        {/* extra scroll room so the ocean image can scroll completely off-screen */}
+        <div className="ocean-spacer" />
+
+        {/* login ui */}
+        <div
+          className="login-overlay"
+          style={{
+            position: "fixed",
+            top: 0,
+            right: 0,
+            padding: "1.5rem",
+            zIndex: 10,
+            opacity: isScrolling ? 0 : 1,
+            transition: "opacity 0.5s",
+          }}
+        >
+          <div className="login-form">
+            <input
+              placeholder="username"
+              value={username}
+              onChange={(e) => {
+                setUsername(e.target.value);
+                if (errorMessage) setErrorMessage(null);
+              }}
+            />
+            <input
+              placeholder="password"
+              type="password"
+              value={password}
+              onChange={(e) => {
+                setPassword(e.target.value);
+                if (errorMessage) setErrorMessage(null);
+              }}
+            />
+            {errorMessage && (
+              <div
+                style={{
+                  color: "rgba(255, 120, 120, 0.95)",
+                  fontSize: "0.8rem",
+                  marginTop: "0.25rem",
+                  maxWidth: 280,
+                }}
+              >
+                {errorMessage}
+              </div>
+            )}
+            <div className="login-buttons">
+              <button onClick={handleLogin}>Login</button>
+              <button className="secondary" onClick={handleSignup}>Signup</button>
+            </div>
           </div>
         </div>
       </div>
 
       {showHomeTransition && (
-        <div
-          style={{
-            position: "fixed",
-            inset: 0,
-            background: "#000",
-            zIndex: 20,
-            display: "flex",
-          }}
-        >
-          <Navbar />
-          <Home />
-        </div>
+        <div className="home-fade-overlay" />
       )}
     </div>
   );

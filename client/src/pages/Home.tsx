@@ -98,7 +98,10 @@ export default function Home() {
   }
 
   return (
-    <div style={{ padding: 24, backgroundColor: "#000000", minHeight: "100vh", position: "relative" }}>
+    <div
+      className="page-fade-in"
+      style={{ padding: 24, paddingRight: 48, backgroundColor: "#000000", minHeight: "100vh", position: "relative" }}
+    >
       {/* react bit liquid background */}
       <div style={{ 
         width: '100vw', 

@@ -17,6 +17,15 @@ body {
   -moz-osx-font-smoothing: unset;
   font-smooth: never;
   text-rendering: optimizeSpeed;
+  overflow-x: hidden;
+}
+
+html {
+  overflow-x: hidden;
+}
+
+#root {
+  overflow-x: hidden;
 }
 
 button {
@@ -63,4 +72,17 @@ input {
 
 .float-bob {
   animation: floatBob 10s ease-in-out infinite;
+}
+
+@keyframes pageFadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.page-fade-in {
+  animation: pageFadeIn 0.8s ease forwards;
 }

@@ -1,12 +1,43 @@
 .login-container {
   position: relative;
+  height: 100vh;
+  overflow: auto;
+
+  /* hide scrollbar cross-browser (keeps programmatic scroll working) */
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE/Edge legacy */
+}
+
+.login-container::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  display: none; /* Chrome/Safari */
+}
+
+.login-container.locked {
+  overflow: hidden;
+}
+
+.login-scene.fading-out {
+  pointer-events: none;
+  animation: fadeOut 1s ease forwards;
+}
+
+.home-fade-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  background: #000;
+  opacity: 0;
+  animation: fadeIn 0.8s ease forwards;
 }
 
 .login-form {
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
-  min-width: 200px;
+  min-width: 280px;
 }
 
 .login-form input {
@@ -71,6 +102,10 @@
   will-change: transform;
 }
 
+.ocean-spacer {
+  height: 120vh;
+}
+
 .home-transition {
   will-change: transform;
   transform: translateY(100%);
@@ -83,5 +118,23 @@
   }
   to {
     transform: translateY(0);
+  }
+}
+
+@keyframes fadeOut {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
   }
 }
