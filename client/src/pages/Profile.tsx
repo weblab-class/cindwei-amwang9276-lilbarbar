@@ -54,7 +54,7 @@ interface ReceivedQuest {
 export default function Profile() {
   const { user, token } = useAuth();
 
-  const row1HeightPx = 350;
+  const row1HeightPx = 400;
   const [showPostModal, setShowPostModal] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
@@ -67,8 +67,6 @@ export default function Profile() {
   const [received, setReceived] = useState<ReceivedQuest[]>([]);
   const [completed, setCompleted] = useState<CompletedQuest[]>([]);
 
-  const visibleFriends = friends.slice(0, 8);
-  const hiddenFriendsCount = Math.max(0, friends.length - visibleFriends.length);
   const [pfpUrl, setPfpUrl] = useState<string | null>(null);
   const [isUploadingPfp, setIsUploadingPfp] = useState(false);
   const [showPfpDialog, setShowPfpDialog] = useState(false);
@@ -336,15 +334,81 @@ export default function Profile() {
             <div style={{ height: row1HeightPx }}>
               <div style={{ height: "100%", overflow: "hidden" }}>
                 <h3 style={{ marginTop: 0 }}>Friends</h3>
-                {friends.length === 0 && <p>No friends yet</p>}
-                {visibleFriends.map((f) => (
-                  <div key={f.id}>@{f.username}</div>
-                ))}
-                {hiddenFriendsCount > 0 && (
-                  <p style={{ color: "rgba(180, 180, 180, 0.9)", marginTop: 6 }}>
-                    +{hiddenFriendsCount} more
-                  </p>
-                )}
+                <div
+                  className="themed-scrollbar"
+                  style={{
+                    height: 100,
+                    overflowY: "auto",
+                    paddingRight: 4,
+                  }}
+                >
+                  {friends.length === 0 ? (
+                    <div
+                      style={{
+                        height: "100%",
+                        display: "flex",
+                        color: "var(--muted)",
+                      }}
+                    >
+                      No friends yet
+                    </div>
+                  ) : (
+                    friends.map((f) => (
+                      <div
+                        key={f.id}
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "space-between",
+                          gap: 8,
+                          padding: "4px 0",
+                        }}
+                      >
+                        <button
+                          onClick={() =>
+                            navigate("/profile", {
+                              state: { profileUsername: f.username },
+                            })
+                          }
+                          style={{
+                            border: "none",
+                            background: "transparent",
+                            color: "var(--text)",
+                            cursor: "pointer",
+                            padding: 0,
+                            textAlign: "left",
+                          }}
+                        >
+                          @{f.username}
+                        </button>
+                        <button
+                          onClick={async () => {
+                            if (!token) return;
+                            try {
+                              await removeFriend(token, f.id);
+                              setFriends((prev) =>
+                                prev.filter((friend) => friend.id !== f.id)
+                              );
+                            } catch (e) {
+                              console.error("Failed to remove friend", e);
+                            }
+                          }}
+                          style={{
+                            border: "none",
+                            background: "transparent",
+                            color: "var(--muted)",
+                            cursor: "pointer",
+                            fontSize: "0.85rem",
+                          }}
+                          aria-label={`Remove @${f.username}`}
+                          title={`Remove @${f.username}`}
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    ))
+                  )}
+                </div>
 
                 <h3 style={{ marginTop: 24 }}>Add Friend</h3>
                 <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
