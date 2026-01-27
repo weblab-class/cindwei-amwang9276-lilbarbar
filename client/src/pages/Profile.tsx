@@ -1172,16 +1172,77 @@ export default function Profile() {
                 </div>
               </div>
             )}
+
+            {/* PFP upload dialog */}
+            {showPfpDialog && (
+              <div
+                style={{
+                  position: "fixed",
+                  inset: 0,
+                  background: "rgba(0,0,0,0.7)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  zIndex: 1000,
+                }}
+                onClick={() => !isUploadingPfp && setShowPfpDialog(false)}
+              >
+                <div
+                  style={{
+                    background: "#050505",
+                    borderRadius: 16,
+                    padding: 20,
+                    width: "min(420px, 90vw)",
+                    boxShadow: "0 18px 60px rgba(0,0,0,0.8)",
+                  }}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <h3 style={{ marginTop: 0, marginBottom: 8 }}>Update profile picture</h3>
+                  <p
+                    style={{
+                      marginTop: 0,
+                      marginBottom: 16,
+                      fontSize: "0.9rem",
+                      color: "rgba(200,200,200,0.9)",
+                    }}
+                  >
+                    Choose a new image to use as your avatar.
+                  </p>
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "flex-end",
+                      gap: 8,
+                      marginTop: 8,
+                    }}
+                  >
+                    <button
+                      className="secondary"
+                      onClick={() => !isUploadingPfp && setShowPfpDialog(false)}
+                      disabled={isUploadingPfp}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={isUploadingPfp}
+                    >
+                      {isUploadingPfp ? "Uploading..." : "Choose image"}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>
 
-      {showPostModal && (
+      {/* {showPostModal && (
         <PostModal
           onClose={() => setShowPostModal(false)}
           onSubmit={handleUpload}
         />
-      )}
+      )} */}
     </div>
   );
 }
