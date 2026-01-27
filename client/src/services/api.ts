@@ -2,6 +2,13 @@ const API = import.meta.env.VITE_API_URL;
 
 export async function fetchQuests(period: "all" | "month" | "week" = "all") {
   const res = await fetch(`${API}/quests?period=${period}`);
+export async function fetchQuests(token?: string) {
+  const res = await fetch(
+    token ? `${API}/quests/with_votes` : `${API}/quests`,
+    token
+      ? { headers: { Authorization: `Bearer ${token}` } }
+      : undefined
+  );
   return res.json();
 }
 
@@ -74,6 +81,16 @@ export async function getFriends(token: string) {
   const res = await fetch(`${API}/friends/list`, {
     headers: { Authorization: `Bearer ${token}` },
   });
+  return res.json();
+}
+
+export async function getFriendsByUsername(token: string, username: string) {
+  const res = await fetch(
+    `${API}/friends/list/by-username/${encodeURIComponent(username)}`,
+    {
+      headers: { Authorization: `Bearer ${token}` },
+    }
+  );
   return res.json();
 }
 
@@ -155,6 +172,21 @@ export async function fetchCompletedQuestsForUser(token: string, userId: string)
 
   if (!res.ok) {
     throw new Error("Failed to fetch completed quests for user");
+export async function fetchCompletedQuestsByUsername(
+  token: string,
+  username: string
+) {
+  const res = await fetch(
+    `${API}/quests/completed/by-username/${encodeURIComponent(username)}`,
+    {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    }
+  );
+
+  if (!res.ok) {
+    throw new Error("Failed to fetch completed quests");
   }
 
   return res.json();

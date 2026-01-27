@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useLocation } from "react-router-dom";
 import LiquidEther from "../components/LiquidEther";
 import PostModal from "../components/PostModal";
@@ -7,6 +7,8 @@ import { fetchPosts, uploadPost, votePost, fetchComments, createComment } from "
 import { useAuth } from "../context/AuthContext";
 import type { Post } from "../types/post";
 import type { Comment } from "../types/comment";
+
+type Vote = -1 | 0 | 1;
 
 export default function Home() {
   const { token } = useAuth();
@@ -19,17 +21,13 @@ export default function Home() {
   const [selectedPost, setSelectedPost] = useState<Post | null>(null);
   const [comments, setComments] = useState<Comment[]>([]);
   const [newComment, setNewComment] = useState("");
+  const [myVotes, setMyVotes] = useState<Record<string, Vote>>({});
+
   const [initialQuestForPostModal, setInitialQuestForPostModal] = useState<
     string | null
   >(completedQuestIdFromProfile);
   const [questSearch, setQuestSearch] = useState("");
   const [showUploadSuccess, setShowUploadSuccess] = useState(false);
-
-  useEffect(() => {
-    if (token) {
-      loadPosts();
-    }
-  }, [token]);
 
   // If we navigated here from Profile after completing a quest, auto-open the post modal
   useEffect(() => {
@@ -45,29 +43,40 @@ export default function Home() {
     return () => clearTimeout(timer);
   }, [showUploadSuccess]);
 
-  async function loadPosts() {
+  const loadPosts = useCallback(async () => {
     if (!token) return;
     try {
-      const allPosts = await fetchPosts(token);
-      
+      const allPosts = (await fetchPosts(token)) as Post[];
+
       // Get top 5 most upvoted posts
-      const topPosts = [...allPosts]
-        .sort((a: Post, b: Post) => b.votes - a.votes)
-        .slice(0, 5);
+      const topPosts = [...allPosts].sort((a, b) => b.votes - a.votes).slice(0, 5);
 
       // Get 5 random posts (excluding top posts)
-      const remainingPosts = allPosts.filter((p: Post) => !topPosts.some((tp) => tp.id === p.id));
-      const randomPosts = [...remainingPosts]
-        .sort(() => Math.random() - 0.5)
-        .slice(0, 5);
+      const remainingPosts = allPosts.filter((p) => !topPosts.some((tp) => tp.id === p.id));
+      const randomPosts = [...remainingPosts].sort(() => Math.random() - 0.5).slice(0, 5);
 
       // Combine: top 5 + random 5 (or less if not enough posts)
       const displayPosts = [...topPosts, ...randomPosts].slice(0, 10);
       setPosts(displayPosts);
+      setMyVotes(() => {
+        const next: Record<string, Vote> = {};
+        for (const p of displayPosts) {
+          next[p.id] = (p.my_vote ?? 0) as Vote;
+        }
+        return next;
+      });
     } catch (error) {
       console.error("Failed to load posts:", error);
     }
-  }
+  }, [token]);
+
+  useEffect(() => {
+    // Defer to avoid synchronous setState within effect body (eslint rule)
+    const t = window.setTimeout(() => {
+      void loadPosts();
+    }, 0);
+    return () => window.clearTimeout(t);
+  }, [loadPosts]);
 
   async function handleUpload(file: File, questId: string) {
     if (!token) {
@@ -78,8 +87,15 @@ export default function Home() {
     setShowUploadSuccess(true);
   }
 
-  async function handleVote(postId: string, delta: number) {
+  async function handleVote(postId: string, direction: 1 | -1) {
     if (!token) return;
+    const prevVote: Vote = myVotes[postId] ?? 0;
+    const nextVote: Vote = prevVote === direction ? 0 : direction;
+    const delta = nextVote - prevVote; // -2, -1, +1, +2
+    if (delta === 0) return;
+
+    // optimistic UI update
+    setMyVotes((prev) => ({ ...prev, [postId]: nextVote }));
     try {
       await votePost(token, postId, delta);
       // Update local state
@@ -94,6 +110,8 @@ export default function Home() {
       );
     } catch (error) {
       console.error("Failed to vote:", error);
+      // rollback optimistic vote state if request failed
+      setMyVotes((prev) => ({ ...prev, [postId]: prevVote }));
     }
   }
 
@@ -233,6 +251,7 @@ export default function Home() {
               <PostCard
                 key={post.id}
                 post={post}
+                myVote={myVotes[post.id] ?? 0}
                 onVote={handleVote}
                 onOpen={async () => {
                   setSelectedPost(post);
@@ -421,11 +440,20 @@ export default function Home() {
                     }}
                   >
                     <button
-                      onClick={() => handleVote(selectedPost.id, 1)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        void handleVote(selectedPost.id, 1);
+                      }}
                       style={{
-                        background: "transparent",
+                        background:
+                          (myVotes[selectedPost.id] ?? 0) === 1
+                            ? "var(--mint)"
+                            : "transparent",
                         border: "1px solid var(--mint)",
-                        color: "var(--mint)",
+                        color:
+                          (myVotes[selectedPost.id] ?? 0) === 1
+                            ? "#000"
+                            : "var(--mint)",
                         padding: "4px 10px",
                         borderRadius: 999,
                         cursor: "pointer",
@@ -444,11 +472,20 @@ export default function Home() {
                       {selectedPost.votes}
                     </span>
                     <button
-                      onClick={() => handleVote(selectedPost.id, -1)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        void handleVote(selectedPost.id, -1);
+                      }}
                       style={{
-                        background: "transparent",
+                        background:
+                          (myVotes[selectedPost.id] ?? 0) === -1
+                            ? "var(--mint)"
+                            : "transparent",
                         border: "1px solid var(--mint)",
-                        color: "var(--mint)",
+                        color:
+                          (myVotes[selectedPost.id] ?? 0) === -1
+                            ? "#000"
+                            : "var(--mint)",
                         padding: "4px 10px",
                         borderRadius: 999,
                         cursor: "pointer",

@@ -2,16 +2,12 @@
   position: relative;
   height: 100vh;
   overflow: auto;
-
-  /* hide scrollbar cross-browser (keeps programmatic scroll working) */
-  scrollbar-width: none; /* Firefox */
-  -ms-overflow-style: none; /* IE/Edge legacy */
 }
 
 .login-container::-webkit-scrollbar {
   width: 0;
   height: 0;
-  display: none; /* Chrome/Safari */
+  display: none;
 }
 
 .login-container.locked {

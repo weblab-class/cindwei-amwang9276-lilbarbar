@@ -87,7 +87,11 @@ def incoming_requests(
         {
             "id": r.id,
             "from_user_id": r.from_user_id,
-            "from_username": user_map.get(r.from_user_id),
+            "from_username": (
+                db.get(User, r.from_user_id).username
+                if db.get(User, r.from_user_id)
+                else None
+            ),
         }
         for r in requests
     ]
@@ -133,6 +137,37 @@ def list_friends(
 
     friends = db.query(User).filter(User.id.in_(friend_ids)).all()
 
+    return [{"id": f.id, "username": f.username} for f in friends]
+
+
+@router.get("/list/by-username/{username}")
+def list_friends_by_username(
+    username: str,
+    db: Session = Depends(get_db),
+    user_id: str = Depends(get_current_user_id),  # noqa: ARG001 - ensure auth
+):
+    """
+    Return a given user's friends (accepted requests) by username.
+    """
+    u = db.query(User).filter(User.username == username).first()
+    if not u:
+        raise HTTPException(404, "User not found")
+
+    accepted = (
+        db.query(FriendRequest)
+        .filter(
+            ((FriendRequest.from_user_id == u.id) | (FriendRequest.to_user_id == u.id)),
+            FriendRequest.status == "accepted",
+        )
+        .all()
+    )
+
+    friend_ids = [
+        r.from_user_id if r.to_user_id == u.id else r.to_user_id
+        for r in accepted
+    ]
+
+    friends = db.query(User).filter(User.id.in_(friend_ids)).all()
     return [{"id": f.id, "username": f.username} for f in friends]
 
 

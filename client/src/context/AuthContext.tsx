@@ -69,6 +69,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
 
     if (!res.ok) {
+      if (res.status === 400) {
+        throw new Error("USERNAME_TAKEN");
+      }
       throw new Error("SIGNUP_FAILED");
     }
     const data = await res.json();

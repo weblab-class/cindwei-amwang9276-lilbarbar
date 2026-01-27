@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 from sqlalchemy.orm import Session
 
 from ..database import SessionLocal
-from ..models import Post, Quest, PostComment, User
+from ..models import Post, Quest, PostComment, User, PostVote
 from ..routes.users import _signed_pfp_url
 from ..schemas import PostCreate, PostOut, CommentCreate, CommentOut
 from ..security import get_current_user_id
@@ -70,6 +70,17 @@ def list_posts(
     """
     posts = db.query(Post).order_by(Post.created_at.desc()).all()
 
+    # Load this user's votes for the returned posts in one query
+    post_ids = [p.id for p in posts]
+    vote_map: dict[str, int] = {}
+    if post_ids:
+        votes = (
+            db.query(PostVote)
+            .filter(PostVote.user_id == user_id, PostVote.post_id.in_(post_ids))
+            .all()
+        )
+        vote_map = {v.post_id: int(v.value) for v in votes}
+
     results: list[PostOut] = []
     for p in posts:
         quest = db.get(Quest, p.quest_id)
@@ -88,6 +99,7 @@ def list_posts(
                 quest_icon=quest.icon if quest else None,
                 poster_username=user.username if user else None,
                 poster_pfp_url=_signed_pfp_url(user.pfp_key) if user else None,
+                my_vote=vote_map.get(p.id, 0),
             )
         )
     return results
@@ -128,6 +140,7 @@ def create_post(
         created_at=post.created_at.isoformat() if post.created_at else None,
         quest_title=quest.title,
         quest_icon=quest.icon,
+        my_vote=0,
         poster_username=user.username if user else None,
         poster_pfp_url=_signed_pfp_url(user.pfp_key) if user else None,
     )
@@ -206,6 +219,7 @@ async def upload_post(
         created_at=post.created_at.isoformat() if post.created_at else None,
         quest_title=quest.title,
         quest_icon=quest.icon,
+        my_vote=0,
         poster_username=user.username if user else None,
         poster_pfp_url=_signed_pfp_url(user.pfp_key) if user else None,
     )
@@ -225,6 +239,28 @@ def vote_post(
     if not post:
         raise HTTPException(status_code=404, detail="Post not found")
 
+    # Persist per-user vote state so it survives refresh/logout.
+    existing = (
+        db.query(PostVote)
+        .filter(PostVote.post_id == post_id, PostVote.user_id == user_id)
+        .first()
+    )
+    prev_value = int(existing.value) if existing else 0
+    next_value = prev_value + int(delta)
+
+    if next_value not in (-1, 0, 1):
+        raise HTTPException(status_code=400, detail="Invalid vote transition")
+
+    if next_value == 0:
+        if existing:
+            db.delete(existing)
+    else:
+        if existing:
+            existing.value = next_value
+            db.add(existing)
+        else:
+            db.add(PostVote(post_id=post_id, user_id=user_id, value=next_value))
+
     post.votes += delta
     db.commit()
     db.refresh(post)
@@ -241,6 +277,7 @@ def vote_post(
         created_at=post.created_at.isoformat() if post.created_at else None,
         quest_title=quest.title if quest else None,
         quest_icon=quest.icon if quest else None,
+        my_vote=next_value,
         poster_username=user.username if user else None,
         poster_pfp_url=_signed_pfp_url(user.pfp_key) if user else None,
     )

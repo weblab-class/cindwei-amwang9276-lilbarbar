@@ -6,10 +6,13 @@ import {
   getIncomingRequests,
   respondFriendRequest,
   getFriends,
+  getFriendsByUsername,
   fetchReceivedQuests,
   completeQuest,
   fetchCompletedQuests,
   fetchCompletedQuestsForUser,
+  fetchCompletedQuestsByUsername,
+  uploadPost,
   fetchMe,
   fetchUserByUsername,
   fetchComments,
@@ -22,6 +25,7 @@ import type { Post } from "../types/post";
 import { fetchPosts } from "../services/api";
 import type { Comment } from "../types/comment";
 import LiquidEther from "../components/LiquidEther";
+import PostModal from "../components/PostModal";
 
 interface CompletedQuest {
   id: string; // quest id (server returns quest_id as id)
@@ -35,7 +39,7 @@ interface CompletedQuest {
 interface FriendRequest {
   id: string;
   from_user_id: string;
-  from_username?: string;
+  from_username?: string | null;
 }
 
 interface Friend {
@@ -51,8 +55,13 @@ interface ReceivedQuest {
 
 //components
 
+type Vote = -1 | 0 | 1;
+
 export default function Profile() {
   const { user, token } = useAuth();
+
+  const row1HeightPx = 400;
+  const [showPostModal, setShowPostModal] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -63,11 +72,13 @@ export default function Profile() {
   const [friends, setFriends] = useState<Friend[]>([]);
   const [received, setReceived] = useState<ReceivedQuest[]>([]);
   const [completed, setCompleted] = useState<CompletedQuest[]>([]);
+
   const [pfpUrl, setPfpUrl] = useState<string | null>(null);
   const [isUploadingPfp, setIsUploadingPfp] = useState(false);
   const [showPfpDialog, setShowPfpDialog] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [myPosts, setMyPosts] = useState<Post[]>([]);
+  const [myVotes, setMyVotes] = useState<Record<string, Vote>>({});
   const [hoveredPostId, setHoveredPostId] = useState<string | null>(null);
   const [selectedPost, setSelectedPost] = useState<Post | null>(null);
   const [comments, setComments] = useState<Comment[]>([]);
@@ -102,17 +113,52 @@ export default function Profile() {
   }, [myPosts]);
 
   async function handleVote(postId: string, delta: number) {
+  // When switching between profiles, clear profile-specific UI state
+  // so we don't flash stale data from the previous user.
+  useEffect(() => {
+    setHoveredBadgeId(null);
+    setCompleted([]);
+    setMyPosts([]);
+    setMyVotes({});
+    setHoveredPostId(null);
+    setSelectedPost(null);
+    setComments([]);
+    setNewComment("");
+    setPfpUrl(null);
+  }, [profileUsername]);
+
+  async function handleVote(postId: string, direction: 1 | -1) {
     if (!token) return;
+    const prevVote: Vote = myVotes[postId] ?? 0;
+    const nextVote: Vote = prevVote === direction ? 0 : direction;
+    const delta = nextVote - prevVote; // -2, -1, +1, +2
+    if (delta === 0) return;
+
+    // optimistic UI update
+    setMyVotes((prev) => ({ ...prev, [postId]: nextVote }));
+    setMyPosts((prev) =>
+      prev.map((p) =>
+        p.id === postId ? { ...p, votes: p.votes + delta, my_vote: nextVote } : p
+      )
+    );
+    setSelectedPost((prev) =>
+      prev && prev.id === postId ? { ...prev, votes: prev.votes + delta, my_vote: nextVote } : prev
+    );
+
     try {
       await votePost(token, postId, delta);
-      setMyPosts((prev) =>
-        prev.map((p) => (p.id === postId ? { ...p, votes: p.votes + delta } : p)),
-      );
-      setSelectedPost((prev) =>
-        prev && prev.id === postId ? { ...prev, votes: prev.votes + delta } : prev,
-      );
     } catch (e) {
       console.error("Failed to vote on post", e);
+      // rollback on failure
+      setMyVotes((prev) => ({ ...prev, [postId]: prevVote }));
+      setMyPosts((prev) =>
+        prev.map((p) =>
+          p.id === postId ? { ...p, votes: p.votes - delta, my_vote: prevVote } : p
+        )
+      );
+      setSelectedPost((prev) =>
+        prev && prev.id === postId ? { ...prev, votes: prev.votes - delta, my_vote: prevVote } : prev
+      );
     }
   }
 
@@ -168,9 +214,19 @@ export default function Profile() {
 
   // friends list
   useEffect(() => {
-    if (!token) return;
-    getFriends(token).then(setFriends);
-  }, [token]);
+    if (!token || !profileUsername) return;
+    const load = async () => {
+      try {
+        const data = isOwnProfile
+          ? await getFriends(token)
+          : await getFriendsByUsername(token, profileUsername);
+        setFriends(data);
+      } catch {
+        // ignore for now
+      }
+    };
+    void load();
+  }, [token, profileUsername, isOwnProfile]);
 
   // load received quests
   useEffect(() => {
@@ -199,6 +255,18 @@ export default function Profile() {
     };
 
     void loadCompleted();
+    const load = async () => {
+      try {
+        const data = isOwnProfile
+          ? await fetchCompletedQuests(token)
+          : await fetchCompletedQuestsByUsername(token, profileUsername);
+        setCompleted(data);
+      } catch {
+        // ignore for now
+      }
+    };
+
+    void load();
   }, [token, profileUsername, isOwnProfile]);
 
   // load my posts for profile grid
@@ -208,7 +276,16 @@ export default function Profile() {
       .then((all: Post[]) =>
         all.filter((p) => p.poster_username === profileUsername)
       )
-      .then(setMyPosts)
+      .then((posts: Post[]) => {
+        setMyPosts(posts);
+        setMyVotes(() => {
+          const next: Record<string, Vote> = {};
+          for (const p of posts) {
+            next[p.id] = (p.my_vote ?? 0) as Vote;
+          }
+          return next;
+        });
+      })
       .catch(() => {
         // ignore for now
       });
@@ -222,6 +299,13 @@ export default function Profile() {
   }
 
   //rendering
+
+  async function handleUpload(file: File, questId: string) {
+    if (!token) {
+      throw new Error("Missing credentials");
+    }
+    await uploadPost(token, file, questId);
+  }
 
   return (
     <div
@@ -257,7 +341,7 @@ export default function Profile() {
       
       {/* content */}
       <div style={{ position: "relative", zIndex: 1 }}>
-        {!isOwnProfile && (
+      {!isOwnProfile && (
           <div
             style={{
               marginBottom: 12,
@@ -293,15 +377,22 @@ export default function Profile() {
             </span>
           </div>
         )}
-        {/* Constrain just the 2-column top section so the right column doesn't drift on wide screens */}
+        
         <div
           className="float-bob"
           style={{ maxWidth: 920, animationDelay: "0.3s" }}
         >
-          <div style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
-            {/* LEFT: username + received quests + badges */}
-            <div style={{ flex: "0 1 560px", minWidth: 320 }}>
-              {/* profile header (left-aligned as a block, but handle centered under avatar) */}
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))",
+              columnGap: 24,
+              rowGap: 50,
+              alignItems: "start",
+            }}
+          >
+            {/* ROW 1 (left): profile */}
+            <div style={{ height: row1HeightPx, overflow: "hidden" }}>
               <div style={{ display: "flex", justifyContent: "flex-start" }}>
                 <div
                   style={{
@@ -534,22 +625,29 @@ export default function Profile() {
               </div>
             </div>
 
-
-              {/* RIGHT: friends + add friend + incoming friend requests + received quests */}
-              <div style={{ width: 340, minWidth: 320 }}>
-                {/* friends */}
+            <div style={{ height: row1HeightPx }}>
+              <div style={{ height: "100%", overflow: "hidden" }}>
                 <h3 style={{ marginTop: 0 }}>Friends</h3>
-                {friends.length === 0 ? (
-                  <p>No friends yet</p>
-                ) : (
-                  <div
-                    style={{
-                      maxHeight: 160, // roughly three rows
-                      overflowY: "auto",
-                      paddingRight: 4,
-                    }}
-                  >
-                    {friends.map((f) => (
+                <div
+                  className="themed-scrollbar"
+                  style={{
+                    height: 100,
+                    overflowY: "auto",
+                    paddingRight: 4,
+                  }}
+                >
+                  {friends.length === 0 ? (
+                    <div
+                      style={{
+                        height: "100%",
+                        display: "flex",
+                        color: "var(--muted)",
+                      }}
+                    >
+                      No friends yet
+                    </div>
+                  ) : (
+                    friends.map((f) => (
                       <div
                         key={f.id}
                         style={{
@@ -577,94 +675,37 @@ export default function Profile() {
                         >
                           @{f.username}
                         </button>
-                        <button
-                          onClick={async () => {
-                            if (!token) return;
-                            try {
-                              await removeFriend(token, f.id);
-                              setFriends((prev) =>
-                                prev.filter((friend) => friend.id !== f.id)
-                              );
-                            } catch (e) {
-                              console.error("Failed to remove friend", e);
-                            }
-                          }}
-                          style={{
-                            border: "none",
-                            background: "transparent",
-                            color: "var(--muted)",
-                            cursor: "pointer",
-                            fontSize: "0.85rem",
-                          }}
-                          aria-label={`Remove @${f.username}`}
-                          title={`Remove @${f.username}`}
-                        >
-                          ✕
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                {/* received quests */}
-                <h3 style={{ marginTop: 24 }}>Received Quests</h3>
-                {received.length === 0 ? (
-                  <p>No active quests</p>
-                ) : (
-                  <div
-                    style={{
-                      maxHeight: 200, // roughly two cards tall
-                      overflowY: "auto",
-                      paddingRight: 4,
-                    }}
-                  >
-                    {received.map((q) => (
-                      <div
-                        key={q.id}
-                        style={{
-                          background: "var(--panel)",
-                          padding: 12,
-                          borderRadius: 8,
-                          marginBottom: 8,
-                        }}
-                      >
-                        <span style={{ fontSize: 20 }}>{q.icon}</span> {q.title}
-
-                        <button
-                          style={{ marginLeft: 12 }}
-                          onClick={async () => {
-                            if (!token) return;
-                            const completedQuest = await completeQuest(token, q.id);
-                            // remove from received list
-                            setReceived((r) => r.filter((x) => x.id !== q.id));
-                            // add badge immediately if not already present
-                            setCompleted((prev) => {
-                              if (prev.some((c) => c.id === completedQuest.quest_id)) {
-                                return prev;
+                        {isOwnProfile && (
+                          <button
+                            onClick={async () => {
+                              if (!token) return;
+                              try {
+                                await removeFriend(token, f.id);
+                                setFriends((prev) =>
+                                  prev.filter((friend) => friend.id !== f.id)
+                                );
+                              } catch (e) {
+                                console.error("Failed to remove friend", e);
                               }
-                              return [
-                                {
-                                  id: completedQuest.quest_id,
-                                  title: completedQuest.title,
-                                  icon: completedQuest.icon,
-                                },
-                                ...prev,
-                              ];
-                            });
-                            // Navigate to home and open the post modal with this quest pre-selected
-                            navigate("/home", {
-                              state: { completedQuestId: completedQuest.quest_id },
-                            });
-                          }}
-                        >
-                          Mark Completed
-                        </button>
+                            }}
+                            style={{
+                              border: "none",
+                              background: "transparent",
+                              color: "var(--muted)",
+                              cursor: "pointer",
+                              fontSize: "0.85rem",
+                            }}
+                            aria-label={`Remove @${f.username}`}
+                            title={`Remove @${f.username}`}
+                          >
+                            ✕
+                          </button>
+                        )}
                       </div>
-                    ))}
-                  </div>
-                )}
+                    ))
+                  )}
+                </div>
 
-                {/* add friend */}
                 <h3 style={{ marginTop: 24 }}>Add Friend</h3>
                 <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
                   <input
@@ -679,308 +720,684 @@ export default function Profile() {
                       sendFriendRequest(token, username);
                       setUsername("");
                     }}
+                    disabled={!isOwnProfile}
                   >
                     Send
                   </button>
                 </div>
 
-                {/* incoming friend reqs */}
                 <h3 style={{ marginTop: 24 }}>Incoming Friend Requests</h3>
                 {requests.length === 0 && <p>No requests</p>}
-                {requests.map((r) => (
-                  <div
-                    key={r.id}
-                    style={{
-                      background: "var(--panel)",
-                      padding: 12,
-                      marginBottom: 8,
-                      borderRadius: 8,
-                    }}
-                  >
-                    <span>
-                      Request from @{r.from_username || r.from_user_id}
-                    </span>
-                    <div style={{ marginTop: 8 }}>
-                      <button
-                        onClick={async () => {
-                          if (!token) return;
-                          await respondFriendRequest(token, r.id, true);
-                          setRequests((rs) => rs.filter((x) => x.id !== r.id));
-                          getFriends(token).then(setFriends);
-                        }}
-                      >
-                        Accept
-                      </button>
-                      <button
-                        className="secondary"
-                        onClick={async () => {
-                          if (!token) return;
-                          await respondFriendRequest(token, r.id, false);
-                          setRequests((rs) => rs.filter((x) => x.id !== r.id));
-                        }}
-                      >
-                        Reject
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
 
-          {/* my posts grid */}
-          <h3 style={{ marginTop: 32 }}>
-            {isOwnProfile ? "Your Posts" : `@${profileUsername}'s Posts`}
-          </h3>
-          {myPosts.length === 0 ? (
-            <div
-              style={{
-                width: "100%",
-                minHeight: "20vh",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                textAlign: "center",
-                color: "rgba(180, 180, 180, 0.9)",
-                padding: "16px 12px",
-              }}
-            >
-              Building your QuestChest...
-            </div>
-          ) : (
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))",
-                gap: 12,
-                marginTop: 8,
-              }}
-            >
-              {myPosts.map((p) => (
                 <div
-                  key={p.id}
-                  onMouseEnter={() => setHoveredPostId(p.id)}
-                  onMouseLeave={() => setHoveredPostId((prev) => (prev === p.id ? null : prev))}
-                  onClick={async () => {
-                    setSelectedPost(p);
-                    setComments([]);
-                    setNewComment("");
-                    await loadCommentsForPost(p.id);
-                  }}
+                  className="themed-scrollbar"
                   style={{
-                    background: "var(--panel)",
-                    borderRadius: 10,
-                    overflow: "hidden",
-                    border: "1px solid rgba(255,255,255,0.06)",
-                    position: "relative",
-                    transform:
-                      hoveredPostId === p.id
-                        ? "translateY(-6px) scale(1.03)"
-                        : "translateY(0) scale(1)",
-                    boxShadow:
-                      hoveredPostId === p.id
-                        ? "0 16px 36px rgba(0,0,0,0.55)"
-                        : "0 4px 10px rgba(0,0,0,0.3)",
-                    transition: "transform 160ms ease-out, box-shadow 160ms ease-out",
-                    cursor: "pointer",
+                    height: 116,
+                    overflowX: "auto",
+                    overflowY: "hidden",
+                    display: "flex",
+                    gap: 16,
+                    alignItems: "flex-start",
+                    WebkitOverflowScrolling: "touch",
                   }}
                 >
-                  {p.media_type === "video" ? (
-                    <video
-                      src={p.media_url}
-                      style={{
-                        width: "100%",
-                        height: 160,
-                        objectFit: "cover",
-                        display: "block",
-                      }}
-                      muted
-                      loop
-                      autoPlay
-                      playsInline
-                    />
-                  ) : (
-                    <img
-                      src={p.media_url}
-                      alt={p.quest_title || "Post"}
-                      style={{
-                        width: "100%",
-                        height: 160,
-                        objectFit: "cover",
-                        display: "block",
-                      }}
-                    />
-                  )}
-                  {hoveredPostId === p.id && p.quest_title && (
+                  {requests.map((r) => (
                     <div
+                      key={r.id}
                       style={{
-                        position: "absolute",
-                        left: 0,
-                        right: 0,
-                        bottom: 0,
-                        padding: "6px 8px",
-                        background:
-                          "linear-gradient(to top, rgba(0,0,0,0.85), rgba(0,0,0,0.3))",
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 6,
-                        fontSize: "0.8rem",
-                        color: "rgba(255,255,255,0.96)",
+                        background: "var(--panel)",
+                        padding: "10px 10px",
+                        borderRadius: 8,
+                        minWidth: 260,
+                        flex: "0 0 auto",
                       }}
                     >
-                      {p.quest_icon && (
-                        <span style={{ fontSize: "1rem" }}>{p.quest_icon}</span>
-                      )}
-                      <span
-                        style={{
-                          overflow: "hidden",
-                          textOverflow: "ellipsis",
-                          whiteSpace: "nowrap",
-                        }}
-                      >
-                        {p.quest_title}
-                      </span>
+                      <span>Request from @{r.from_username ?? r.from_user_id}</span>
+                      <div style={{ marginTop: 14, display: "flex", gap: 16 }}>
+                        <button
+                          onClick={async () => {
+                            if (!isOwnProfile) return;
+                            if (!token) return;
+                            await respondFriendRequest(token, r.id, true);
+                            setRequests((rs) => rs.filter((x) => x.id !== r.id));
+                            getFriends(token).then(setFriends);
+                          }}
+                          disabled={!isOwnProfile}
+                        >
+                          Accept
+                        </button>
+                        <button
+                          className="secondary"
+                          onClick={async () => {
+                            if (!isOwnProfile) return;
+                            if (!token) return;
+                            await respondFriendRequest(token, r.id, false);
+                            setRequests((rs) => rs.filter((x) => x.id !== r.id));
+                          }}
+                          disabled={!isOwnProfile}
+                        >
+                          Reject
+                        </button>
+                      </div>
                     </div>
-                  )}
+                  ))}
                 </div>
-              ))}
+              </div>
             </div>
-          )}
-        </div>
 
-        {selectedPost && (
-          <div
-            style={{
-              position: "fixed",
-              inset: 0,
-              background: "rgba(0,0,0,0.75)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              zIndex: 1000,
-            }}
-            onClick={() => setSelectedPost(null)}
-          >
-            <div
-              style={{
-                background: "#050505",
-                borderRadius: 16,
-                maxWidth: "90vw",
-                maxHeight: "90vh",
-                overflow: "hidden",
-                boxShadow: "0 24px 80px rgba(0,0,0,0.85)",
-                display: "flex",
-              }}
-              onClick={(e) => e.stopPropagation()}
-            >
-              {/* Left: media + quest + votes + meta */}
-              <div
-                style={{
-                  flex: 3,
-                  display: "flex",
-                  flexDirection: "column",
-                  background: "#000",
-                }}
-              >
-                <div
-                  style={{
-                    position: "relative",
-                    flex: 1,
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    padding: 12,
-                  }}
-                >
-                  {/* Close button */}
-                  <button
-                    onClick={() => setSelectedPost(null)}
+            {/* ROW 2 (left): quest badges */}
+            <div>            
+              <h3 style={{ marginTop: 0 }}>Quest Badges</h3>
+                {completed.length === 0 ? (
+                  <p
                     style={{
-                      position: "absolute",
-                      top: 12,
-                      right: 16,
-                      background: "rgba(0,0,0,0.7)",
-                      border: "1px solid var(--muted)",
-                      borderRadius: 999,
-                      color: "var(--text)",
-                      padding: "4px 10px",
-                      cursor: "pointer",
+                      margin: 0,
                       fontSize: "0.85rem",
-                      zIndex: 3,
+                      color: "rgba(160,160,160,0.9)",
                     }}
                   >
-                    ✕
-                  </button>
-
-                  {/* Media */}
-                  {selectedPost.media_type === "video" ? (
-                    <video
-                      src={selectedPost.media_url}
-                      style={{
-                        maxWidth: "100%",
-                        maxHeight: "80vh",
-                        objectFit: "contain",
-                      }}
-                      muted
-                      loop
-                      autoPlay
-                      playsInline
-                      controls
-                    />
-                  ) : (
-                    <img
-                      src={selectedPost.media_url}
-                      alt={selectedPost.quest_title || "Post"}
-                      style={{
-                        maxWidth: "100%",
-                        maxHeight: "80vh",
-                        objectFit: "contain",
-                      }}
-                    />
-                  )}
-                </div>
-
-                <div
-                  style={{
-                    padding: 16,
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: 12,
-                    background: "var(--panel)",
-                  }}
-                >
+                    {isOwnProfile
+                      ? "You have no badges yet. Complete shared quests to earn them."
+                      : `@${profileUsername} has no badges yet.`}
+                  </p>
+                ) : (
                   <div
                     style={{
                       display: "flex",
-                      alignItems: "center",
-                      justifyContent: "space-between",
-                      gap: 16,
+                      flexWrap: "wrap",
+                      gap: 8,
+                      justifyContent: "center",
+                      marginTop: 4,
+                    }}
+                  >
+                    {completed.map((c) => (
+                      <div
+                        key={c.id}
+                        style={{
+                          position: "relative",
+                          display: "inline-flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                        }}
+                        onMouseEnter={() => setHoveredBadgeId(c.id)}
+                        onMouseLeave={() => setHoveredBadgeId(null)}
+                      >
+                        <span
+                          style={{
+                            fontSize: "1.8rem",
+                            filter: "drop-shadow(0 0 6px rgba(0,0,0,0.6))",
+                            cursor: "default",
+                          }}
+                        >
+                          {c.icon}
+                        </span>
+                        {hoveredBadgeId === c.id && (
+                          <div
+                            style={{
+                              position: "absolute",
+                              top: "120%",
+                              left: "50%",
+                              transform: "translateX(-50%)",
+                              whiteSpace: "nowrap",
+                              background: "rgba(0, 0, 0, 0.85)",
+                              color: "rgba(255, 255, 255, 0.95)",
+                              padding: "4px 8px",
+                              borderRadius: 6,
+                              fontSize: "0.75rem",
+                              boxShadow: "0 4px 12px rgba(0,0,0,0.6)",
+                              pointerEvents: "none",
+                              zIndex: 10,
+                            }}
+                          >
+                            {c.title}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+            </div>
+
+            {/* ROW 2 (right): received quests */}
+            <div>
+              <h3 style={{ marginTop: 0 }}>Received Quests</h3>
+              {received.length === 0 ? (
+                <p>No active quests</p>
+              ) : (
+                <div
+                  className="themed-scrollbar"
+                  style={{
+                    height: 150,
+                    overflowY: "auto",
+                    paddingRight: 6,
+                  }}
+                >
+                  {received.map((q) => (
+                    <div
+                      key={q.id}
+                      style={{
+                        background: "var(--panel)",
+                        padding: 12,
+                        borderRadius: 8,
+                        marginBottom: 8,
+                      }}
+                    >
+                      <span style={{ fontSize: 20 }}>{q.icon}</span> {q.title}
+
+                      <button
+                        style={{ marginLeft: 12 }}
+                        onClick={async () => {
+                          if (!isOwnProfile) return;
+                          if (!token) return;
+                          const completedQuest = await completeQuest(token, q.id);
+                          // remove from received list
+                          setReceived((r) => r.filter((x) => x.id !== q.id));
+                          // add badge immediately if not already present
+                          setCompleted((prev) => {
+                            if (prev.some((c) => c.id === completedQuest.quest_id)) {
+                              return prev;
+                            }
+                            return [
+                              {
+                                id: completedQuest.quest_id,
+                                title: completedQuest.title,
+                                icon: completedQuest.icon,
+                              },
+                              ...prev,
+                            ];
+                          });
+                          // Navigate to home and open the post modal with this quest pre-selected
+                          navigate("/home", {
+                            state: { completedQuestId: completedQuest.quest_id },
+                          });
+                        }}
+                        disabled={!isOwnProfile}
+                      >
+                        Mark Completed
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* FULL WIDTH: completed quests */}
+            <div style={{ gridColumn: "1 / -1" }}>
+              <h3 style={{ marginTop: 4 }}>
+                {isOwnProfile ? "Your Posts" : `@${profileUsername}'s Posts`}
+              </h3>
+              {myPosts.length === 0 ? (
+                <div
+                  style={{
+                    width: "100%",
+                    minHeight: "20vh",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    textAlign: "center",
+                    color: "rgba(180, 180, 180, 0.9)",
+                    padding: "16px 12px",
+                  }}
+                >
+                  {isOwnProfile
+                    ? "Building your QuestChest..."
+                    : `Building @${profileUsername}'s QuestChest...`}
+                </div>
+              ) : (
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))",
+                    gap: 12,
+                    marginTop: 8,
+                  }}
+                >
+                  {myPosts.map((p) => (
+                    <div
+                      key={p.id}
+                      onMouseEnter={() => setHoveredPostId(p.id)}
+                      onMouseLeave={() => setHoveredPostId((prev) => (prev === p.id ? null : prev))}
+                      onClick={async () => {
+                        setSelectedPost(p);
+                        setComments([]);
+                        setNewComment("");
+                        await loadCommentsForPost(p.id);
+                      }}
+                      style={{
+                        background: "var(--panel)",
+                        borderRadius: 10,
+                        overflow: "hidden",
+                        border: "1px solid rgba(255,255,255,0.06)",
+                        position: "relative",
+                        transform:
+                          hoveredPostId === p.id
+                            ? "translateY(-6px) scale(1.03)"
+                            : "translateY(0) scale(1)",
+                        boxShadow:
+                          hoveredPostId === p.id
+                            ? "0 16px 36px rgba(0,0,0,0.55)"
+                            : "0 4px 10px rgba(0,0,0,0.3)",
+                        transition: "transform 160ms ease-out, box-shadow 160ms ease-out",
+                        cursor: "pointer",
+                      }}
+                    >
+                      {p.media_type === "video" ? (
+                        <video
+                          src={p.media_url}
+                          style={{
+                            width: "100%",
+                            height: 160,
+                            objectFit: "cover",
+                            display: "block",
+                          }}
+                          muted
+                          loop
+                          autoPlay
+                          playsInline
+                        />
+                      ) : (
+                        <img
+                          src={p.media_url}
+                          alt={p.quest_title || "Post"}
+                          style={{
+                            width: "100%",
+                            height: 160,
+                            objectFit: "cover",
+                            display: "block",
+                          }}
+                        />
+                      )}
+                      {hoveredPostId === p.id && p.quest_title && (
+                        <div
+                          style={{
+                            position: "absolute",
+                            left: 0,
+                            right: 0,
+                            bottom: 0,
+                            padding: "6px 8px",
+                            background:
+                              "linear-gradient(to top, rgba(0,0,0,0.85), rgba(0,0,0,0.3))",
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 6,
+                            fontSize: "0.8rem",
+                            color: "rgba(255,255,255,0.96)",
+                          }}
+                        >
+                          {p.quest_icon && (
+                            <span style={{ fontSize: "1rem" }}>{p.quest_icon}</span>
+                          )}
+                          <span
+                            style={{
+                              overflow: "hidden",
+                              textOverflow: "ellipsis",
+                              whiteSpace: "nowrap",
+                            }}
+                          >
+                            {p.quest_title}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {selectedPost && (
+              <div
+                style={{
+                  position: "fixed",
+                  inset: 0,
+                  background: "rgba(0,0,0,0.75)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  zIndex: 1000,
+                }}
+                onClick={() => setSelectedPost(null)}
+              >
+                <div
+                  style={{
+                    background: "#050505",
+                    borderRadius: 16,
+                    maxWidth: "90vw",
+                    maxHeight: "90vh",
+                    overflow: "hidden",
+                    boxShadow: "0 24px 80px rgba(0,0,0,0.85)",
+                    display: "flex",
+                  }}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {/* Left: media + quest + votes + meta */}
+                  <div
+                    style={{
+                      flex: 3,
+                      display: "flex",
+                      flexDirection: "column",
+                      background: "#000",
                     }}
                   >
                     <div
-                      style={{ display: "flex", alignItems: "center", gap: 10 }}
+                      style={{
+                        position: "relative",
+                        flex: 1,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        padding: 12,
+                      }}
                     >
-                      <span style={{ fontSize: "1.6rem" }}>
-                        {selectedPost.quest_icon}
-                      </span>
-                      <div>
+                      {/* Close button */}
+                      <button
+                        onClick={() => setSelectedPost(null)}
+                        style={{
+                          position: "absolute",
+                          top: 12,
+                          right: 16,
+                          background: "rgba(0,0,0,0.7)",
+                          border: "1px solid var(--muted)",
+                          borderRadius: 999,
+                          color: "var(--text)",
+                          padding: "4px 10px",
+                          cursor: "pointer",
+                          fontSize: "0.85rem",
+                          zIndex: 3,
+                        }}
+                      >
+                        ✕
+                      </button>
+
+                      {/* Media */}
+                      {selectedPost.media_type === "video" ? (
+                        <video
+                          src={selectedPost.media_url}
+                          style={{
+                            maxWidth: "100%",
+                            maxHeight: "80vh",
+                            objectFit: "contain",
+                          }}
+                          muted
+                          loop
+                          autoPlay
+                          playsInline
+                          controls
+                        />
+                      ) : (
+                        <img
+                          src={selectedPost.media_url}
+                          alt={selectedPost.quest_title || "Post"}
+                          style={{
+                            maxWidth: "100%",
+                            maxHeight: "80vh",
+                            objectFit: "contain",
+                          }}
+                        />
+                      )}
+                    </div>
+
+                    <div
+                      style={{
+                        padding: 16,
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: 12,
+                        background: "var(--panel)",
+                      }}
+                    >
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "space-between",
+                          gap: 16,
+                        }}
+                      >
+                        <div
+                          style={{ display: "flex", alignItems: "center", gap: 10 }}
+                        >
+                          <span style={{ fontSize: "1.6rem" }}>
+                            {selectedPost.quest_icon}
+                          </span>
+                          <div>
+                            <div
+                              style={{
+                                fontSize: "0.95rem",
+                                fontWeight: 600,
+                              }}
+                            >
+                              {selectedPost.quest_title}
+                            </div>
+                            <div
+                              style={{
+                                fontSize: "0.8rem",
+                                color: "var(--muted)",
+                              }}
+                            >
+                              Linked quest
+                            </div>
+                          </div>
+                        </div>
+
                         <div
                           style={{
-                            fontSize: "0.95rem",
-                            fontWeight: 600,
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 8,
                           }}
                         >
-                          {selectedPost.quest_title}
+                          <button
+                            onClick={() => handleVote(selectedPost.id, 1)}
+                            style={{
+                              background:
+                                (myVotes[selectedPost.id] ?? 0) === 1
+                                  ? "var(--mint)"
+                                  : "transparent",
+                              border: "1px solid var(--mint)",
+                              color:
+                                (myVotes[selectedPost.id] ?? 0) === 1
+                                  ? "#000"
+                                  : "var(--mint)",
+                              padding: "4px 10px",
+                              borderRadius: 999,
+                              cursor: "pointer",
+                              fontSize: "0.9rem",
+                            }}
+                          >
+                            ↑
+                          </button>
+                          <span
+                            style={{
+                              minWidth: "32px",
+                              textAlign: "center",
+                              fontWeight: 700,
+                            }}
+                          >
+                            {selectedPost.votes}
+                          </span>
+                          <button
+                            onClick={() => handleVote(selectedPost.id, -1)}
+                            style={{
+                              background:
+                                (myVotes[selectedPost.id] ?? 0) === -1
+                                  ? "var(--mint)"
+                                  : "transparent",
+                              border: "1px solid var(--mint)",
+                              color:
+                                (myVotes[selectedPost.id] ?? 0) === -1
+                                  ? "#000"
+                                  : "var(--mint)",
+                              padding: "4px 10px",
+                              borderRadius: 999,
+                              cursor: "pointer",
+                              fontSize: "0.9rem",
+                            }}
+                          >
+                            ↓
+                          </button>
                         </div>
+                      </div>
+
+                      {/* Meta row with date and optional delete */}
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "space-between",
+                          fontSize: "0.8rem",
+                          color: "var(--muted)",
+                          marginTop: 4,
+                        }}
+                      >
+                        <span>
+                          {(() => {
+                            const date =
+                              selectedPost.created_at
+                                ? new Date(selectedPost.created_at)
+                                : fallbackCreatedAt;
+                            return date.toLocaleString(undefined, {
+                              month: "short",
+                              day: "numeric",
+                              year: "numeric",
+                              hour: "numeric",
+                              minute: "2-digit",
+                            });
+                          })()}
+                        </span>
+                        {isOwnProfile && (
+                          <button
+                            onClick={async () => {
+                              if (!token || !selectedPost) return;
+                              try {
+                                const { deletePost } = await import("../services/api");
+                                await deletePost(token, selectedPost.id);
+                                setMyPosts((prev) =>
+                                  prev.filter((p) => p.id !== selectedPost.id),
+                                );
+                                setSelectedPost(null);
+                              } catch (e) {
+                                console.error("Failed to delete post", e);
+                              }
+                            }}
+                            style={{
+                              background: "transparent",
+                              border: "1px solid rgba(255,0,0,0.5)",
+                              color: "rgba(255,120,120,0.95)",
+                              padding: "4px 10px",
+                              borderRadius: 999,
+                              cursor: "pointer",
+                              fontSize: "0.8rem",
+                            }}
+                          >
+                            Delete Post
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Right: comments column */}
+                  <div
+                    style={{
+                      flex: 2,
+                      display: "flex",
+                      flexDirection: "column",
+                      background: "var(--panel)",
+                      borderLeft: "1px solid var(--muted)",
+                      padding: 16,
+                      maxWidth: "360px",
+                    }}
+                  >
+                    <div
+                      style={{
+                        fontSize: "0.9rem",
+                        fontWeight: 600,
+                        marginBottom: 8,
+                      }}
+                    >
+                      Comments
+                    </div>
+
+                    <div
+                      style={{
+                        flex: 1,
+                        overflowY: "auto",
+                        marginBottom: 8,
+                      }}
+                    >
+                      {comments.length === 0 ? (
                         <div
                           style={{
-                            fontSize: "0.8rem",
+                            fontSize: "0.85rem",
                             color: "var(--muted)",
                           }}
                         >
-                          Linked quest
+                          No comments yet. Be the first to comment.
                         </div>
-                      </div>
+                      ) : (
+                        comments.map((c) => {
+                          const displayName = c.username ?? "anon";
+                          const initial = displayName[0]?.toUpperCase() ?? "?";
+                          return (
+                            <div
+                              key={c.id}
+                              style={{
+                                marginBottom: 8,
+                                fontSize: "0.85rem",
+                                display: "flex",
+                                alignItems: "flex-start",
+                                gap: 8,
+                              }}
+                            >
+                              <div
+                                style={{
+                                  width: 24,
+                                  height: 24,
+                                  borderRadius: "50%",
+                                  background: c.pfp_url
+                                    ? "transparent"
+                                    : "rgba(255,255,255,0.12)",
+                                  border: "1px solid rgba(255,255,255,0.28)",
+                                  display: "flex",
+                                  alignItems: "center",
+                                  justifyContent: "center",
+                                  fontSize: "0.65rem",
+                                  fontWeight: 700,
+                                  color: "rgba(255,255,255,0.9)",
+                                  overflow: "hidden",
+                                  flexShrink: 0,
+                                }}
+                              >
+                                {c.pfp_url ? (
+                                  <img
+                                    src={c.pfp_url}
+                                    alt={`${displayName} avatar`}
+                                    style={{
+                                      width: "100%",
+                                      height: "100%",
+                                      objectFit: "cover",
+                                      display: "block",
+                                    }}
+                                  />
+                                ) : (
+                                  initial
+                                )}
+                              </div>
+                              <div>
+                                <span
+                                  style={{
+                                    fontWeight: 600,
+                                    marginRight: 4,
+                                  }}
+                                >
+                                  {displayName}:
+                                </span>
+                                <span>{c.content}</span>
+                              </div>
+                            </div>
+                          );
+                        })
+                      )}
                     </div>
 
                     <div
@@ -988,321 +1405,122 @@ export default function Profile() {
                         display: "flex",
                         alignItems: "center",
                         gap: 8,
+                        marginTop: 4,
                       }}
                     >
-                      <button
-                        onClick={() => handleVote(selectedPost.id, 1)}
-                        style={{
-                          background: "transparent",
-                          border: "1px solid var(--mint)",
-                          color: "var(--mint)",
-                          padding: "4px 10px",
-                          borderRadius: 999,
-                          cursor: "pointer",
-                          fontSize: "0.9rem",
-                        }}
-                      >
-                        ↑
-                      </button>
-                      <span
-                        style={{
-                          minWidth: "32px",
-                          textAlign: "center",
-                          fontWeight: 700,
-                        }}
-                      >
-                        {selectedPost.votes}
-                      </span>
-                      <button
-                        onClick={() => handleVote(selectedPost.id, -1)}
-                        style={{
-                          background: "transparent",
-                          border: "1px solid var(--mint)",
-                          color: "var(--mint)",
-                          padding: "4px 10px",
-                          borderRadius: 999,
-                          cursor: "pointer",
-                          fontSize: "0.9rem",
-                        }}
-                      >
-                        ↓
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Meta row with date and optional delete */}
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "space-between",
-                      fontSize: "0.8rem",
-                      color: "var(--muted)",
-                      marginTop: 4,
-                    }}
-                  >
-                    <span>
-                      {(() => {
-                        const date =
-                          selectedPost.created_at
-                            ? new Date(selectedPost.created_at)
-                            : fallbackCreatedAt;
-                        return date.toLocaleString(undefined, {
-                          month: "short",
-                          day: "numeric",
-                          year: "numeric",
-                          hour: "numeric",
-                          minute: "2-digit",
-                        });
-                      })()}
-                    </span>
-                    {isOwnProfile && (
-                      <button
-                        onClick={async () => {
-                          if (!token || !selectedPost) return;
-                          try {
-                            const { deletePost } = await import("../services/api");
-                            await deletePost(token, selectedPost.id);
-                            setMyPosts((prev) =>
-                              prev.filter((p) => p.id !== selectedPost.id),
-                            );
-                            setSelectedPost(null);
-                          } catch (e) {
-                            console.error("Failed to delete post", e);
+                      <input
+                        placeholder="Add a comment..."
+                        value={newComment}
+                        onChange={(e) => setNewComment(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            void handleCreateComment();
                           }
                         }}
                         style={{
+                          flex: 1,
+                          padding: "6px 10px",
+                          borderRadius: 8,
+                          border: "1px solid var(--muted)",
                           background: "transparent",
-                          border: "1px solid rgba(255,0,0,0.5)",
-                          color: "rgba(255,120,120,0.95)",
-                          padding: "4px 10px",
+                          color: "var(--text)",
+                          fontSize: "0.85rem",
+                        }}
+                      />
+                      <button
+                        onClick={handleCreateComment}
+                        disabled={!newComment.trim()}
+                        style={{
+                          background: newComment.trim()
+                            ? "var(--mint)"
+                            : "rgba(255,255,255,0.12)",
+                          border: "none",
+                          color: newComment.trim() ? "#000" : "var(--muted)",
+                          padding: "6px 12px",
                           borderRadius: 999,
-                          cursor: "pointer",
-                          fontSize: "0.8rem",
+                          cursor: newComment.trim() ? "pointer" : "default",
+                          fontSize: "0.85rem",
+                          fontWeight: 600,
                         }}
                       >
-                        Delete Post
+                        Post
                       </button>
-                    )}
+                    </div>
                   </div>
                 </div>
               </div>
+            )}
 
-              {/* Right: comments column */}
+            {/* PFP upload dialog */}
+            {showPfpDialog && (
               <div
                 style={{
-                  flex: 2,
+                  position: "fixed",
+                  inset: 0,
+                  background: "rgba(0,0,0,0.7)",
                   display: "flex",
-                  flexDirection: "column",
-                  background: "var(--panel)",
-                  borderLeft: "1px solid var(--muted)",
-                  padding: 16,
-                  maxWidth: "360px",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  zIndex: 1000,
                 }}
+                onClick={() => !isUploadingPfp && setShowPfpDialog(false)}
               >
                 <div
                   style={{
-                    fontSize: "0.9rem",
-                    fontWeight: 600,
-                    marginBottom: 8,
+                    background: "#050505",
+                    borderRadius: 16,
+                    padding: 20,
+                    width: "min(420px, 90vw)",
+                    boxShadow: "0 18px 60px rgba(0,0,0,0.8)",
                   }}
+                  onClick={(e) => e.stopPropagation()}
                 >
-                  Comments
-                </div>
-
-                <div
-                  style={{
-                    flex: 1,
-                    overflowY: "auto",
-                    marginBottom: 8,
-                  }}
-                >
-                  {comments.length === 0 ? (
-                    <div
-                      style={{
-                        fontSize: "0.85rem",
-                        color: "var(--muted)",
-                      }}
-                    >
-                      No comments yet. Be the first to comment.
-                    </div>
-                  ) : (
-                    comments.map((c) => {
-                      const displayName = c.username ?? "anon";
-                      const initial = displayName[0]?.toUpperCase() ?? "?";
-                      return (
-                        <div
-                          key={c.id}
-                          style={{
-                            marginBottom: 8,
-                            fontSize: "0.85rem",
-                            display: "flex",
-                            alignItems: "flex-start",
-                            gap: 8,
-                          }}
-                        >
-                          <div
-                            style={{
-                              width: 24,
-                              height: 24,
-                              borderRadius: "50%",
-                              background: c.pfp_url
-                                ? "transparent"
-                                : "rgba(255,255,255,0.12)",
-                              border: "1px solid rgba(255,255,255,0.28)",
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                              fontSize: "0.65rem",
-                              fontWeight: 700,
-                              color: "rgba(255,255,255,0.9)",
-                              overflow: "hidden",
-                              flexShrink: 0,
-                            }}
-                          >
-                            {c.pfp_url ? (
-                              <img
-                                src={c.pfp_url}
-                                alt={`${displayName} avatar`}
-                                style={{
-                                  width: "100%",
-                                  height: "100%",
-                                  objectFit: "cover",
-                                  display: "block",
-                                }}
-                              />
-                            ) : (
-                              initial
-                            )}
-                          </div>
-                          <div>
-                            <span
-                              style={{
-                                fontWeight: 600,
-                                marginRight: 4,
-                              }}
-                            >
-                              {displayName}:
-                            </span>
-                            <span>{c.content}</span>
-                          </div>
-                        </div>
-                      );
-                    })
-                  )}
-                </div>
-
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 8,
-                    marginTop: 4,
-                  }}
-                >
-                  <input
-                    placeholder="Add a comment..."
-                    value={newComment}
-                    onChange={(e) => setNewComment(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") {
-                        e.preventDefault();
-                        void handleCreateComment();
-                      }
-                    }}
+                  <h3 style={{ marginTop: 0, marginBottom: 8 }}>Update profile picture</h3>
+                  <p
                     style={{
-                      flex: 1,
-                      padding: "6px 10px",
-                      borderRadius: 8,
-                      border: "1px solid var(--muted)",
-                      background: "transparent",
-                      color: "var(--text)",
-                      fontSize: "0.85rem",
-                    }}
-                  />
-                  <button
-                    onClick={handleCreateComment}
-                    disabled={!newComment.trim()}
-                    style={{
-                      background: newComment.trim()
-                        ? "var(--mint)"
-                        : "rgba(255,255,255,0.12)",
-                      border: "none",
-                      color: newComment.trim() ? "#000" : "var(--muted)",
-                      padding: "6px 12px",
-                      borderRadius: 999,
-                      cursor: newComment.trim() ? "pointer" : "default",
-                      fontSize: "0.85rem",
-                      fontWeight: 600,
+                      marginTop: 0,
+                      marginBottom: 16,
+                      fontSize: "0.9rem",
+                      color: "rgba(200,200,200,0.9)",
                     }}
                   >
-                    Post
-                  </button>
+                    Choose a new image to use as your avatar.
+                  </p>
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "flex-end",
+                      gap: 8,
+                      marginTop: 8,
+                    }}
+                  >
+                    <button
+                      className="secondary"
+                      onClick={() => !isUploadingPfp && setShowPfpDialog(false)}
+                      disabled={isUploadingPfp}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={isUploadingPfp}
+                    >
+                      {isUploadingPfp ? "Uploading..." : "Choose image"}
+                    </button>
+                  </div>
                 </div>
               </div>
-            </div>
-          </div>
-        )}
-
-      {/* PFP upload dialog */}
-      {showPfpDialog && (
-        <div
-          style={{
-            position: "fixed",
-            inset: 0,
-            background: "rgba(0,0,0,0.7)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            zIndex: 1000,
-          }}
-          onClick={() => !isUploadingPfp && setShowPfpDialog(false)}
-        >
-          <div
-            style={{
-              background: "#050505",
-              borderRadius: 16,
-              padding: 20,
-              width: "min(420px, 90vw)",
-              boxShadow: "0 18px 60px rgba(0,0,0,0.8)",
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h3 style={{ marginTop: 0, marginBottom: 8 }}>Update profile picture</h3>
-            <p
-              style={{
-                marginTop: 0,
-                marginBottom: 16,
-                fontSize: "0.9rem",
-                color: "rgba(200,200,200,0.9)",
-              }}
-            >
-              Choose a new image to use as your avatar.
-            </p>
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "flex-end",
-                gap: 8,
-                marginTop: 8,
-              }}
-            >
-              <button
-                className="secondary"
-                onClick={() => !isUploadingPfp && setShowPfpDialog(false)}
-                disabled={isUploadingPfp}
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => fileInputRef.current?.click()}
-                disabled={isUploadingPfp}
-              >
-                {isUploadingPfp ? "Uploading..." : "Choose image"}
-              </button>
-            </div>
+            )}
           </div>
         </div>
+      </div>
+
+      {showPostModal && (
+        <PostModal
+          onClose={() => setShowPostModal(false)}
+          onSubmit={handleUpload}
+        />
       )}
     </div>
   );

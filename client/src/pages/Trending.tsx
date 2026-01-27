@@ -7,6 +7,8 @@ import { fetchQuests, createQuest, voteQuest } from "../services/api";
 import { useAuth } from "../context/AuthContext";
 import LiquidEther from "../components/LiquidEther";
 
+type Vote = -1 | 0 | 1;
+
 
 
 export default function Trending() {
@@ -19,11 +21,29 @@ export default function Trending() {
   useEffect(() => {
     fetchQuests(timePeriod).then(setQuests);
   }, [timePeriod]);
+  const [myVotes, setMyVotes] = useState<Record<string, Vote>>({});
 
-  async function handleVote(id: string, delta: number) {
+  useEffect(() => {
+    fetchQuests(token ?? undefined).then((qs) => {
+      setQuests(qs);
+      const next: Record<string, Vote> = {};
+      for (const q of qs as Sidequest[]) {
+        next[q.id] = (q.my_vote ?? 0) as Vote;
+      }
+      setMyVotes(next);
+    });
+  }, [token]);
+
+  async function handleVote(id: string, direction: 1 | -1) {
     if (!token) return;
 
+    const prevVote: Vote = myVotes[id] ?? 0;
+    const nextVote: Vote = prevVote === direction ? 0 : direction;
+    const delta = nextVote - prevVote; // -2, -1, +1, +2
+    if (delta === 0) return;
+
     // Optimistic update so UI responds instantly
+    setMyVotes((prev) => ({ ...prev, [id]: nextVote }));
     setQuests((qs) =>
       qs
         .map((q) => (q.id === id ? { ...q, votes: q.votes + delta } : q))
@@ -36,6 +56,9 @@ export default function Trending() {
       console.error("Failed to vote on quest:", e);
       // Optionally reload from server if you want to fully sync:
       fetchQuests(timePeriod).then(setQuests);
+      setMyVotes((prev) => ({ ...prev, [id]: prevVote }));
+      // Reload from server to fully sync:
+      fetchQuests(token).then(setQuests);
     }
   }
 
@@ -139,6 +162,7 @@ export default function Trending() {
         <SidequestCard
           key={q.id}
           quest={q}
+          myVote={myVotes[q.id] ?? 0}
           onVote={handleVote}
           onShare={() => setShareQuestId(q.id)}
           index={index}
