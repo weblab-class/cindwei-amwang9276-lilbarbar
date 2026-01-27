@@ -6,9 +6,11 @@ import {
   getIncomingRequests,
   respondFriendRequest,
   getFriends,
+  getFriendsByUsername,
   fetchReceivedQuests,
   completeQuest,
   fetchCompletedQuests,
+  fetchCompletedQuestsByUsername,
   uploadPost,
   fetchMe,
   fetchUserByUsername,
@@ -85,6 +87,20 @@ export default function Profile() {
   const isOwnProfile = profileUsername === user?.username;
 
   const fallbackCreatedAt = new Date("2026-01-27T09:00:00");
+
+  // When switching between profiles, clear profile-specific UI state
+  // so we don't flash stale data from the previous user.
+  useEffect(() => {
+    setHoveredBadgeId(null);
+    setCompleted([]);
+    setMyPosts([]);
+    setMyVotes({});
+    setHoveredPostId(null);
+    setSelectedPost(null);
+    setComments([]);
+    setNewComment("");
+    setPfpUrl(null);
+  }, [profileUsername]);
 
   async function handleVote(postId: string, direction: 1 | -1) {
     if (!token) return;
@@ -173,9 +189,19 @@ export default function Profile() {
 
   // friends list
   useEffect(() => {
-    if (!token) return;
-    getFriends(token).then(setFriends);
-  }, [token]);
+    if (!token || !profileUsername) return;
+    const load = async () => {
+      try {
+        const data = isOwnProfile
+          ? await getFriends(token)
+          : await getFriendsByUsername(token, profileUsername);
+        setFriends(data);
+      } catch {
+        // ignore for now
+      }
+    };
+    void load();
+  }, [token, profileUsername, isOwnProfile]);
 
   // load received quests
   useEffect(() => {
@@ -185,9 +211,21 @@ export default function Profile() {
 
   //load completed quests here NOT IMPLEMENTED TODO
   useEffect(() => {
-    if (!token) return;
-    fetchCompletedQuests(token).then(setCompleted);
-  }, [token]);
+    if (!token || !profileUsername) return;
+
+    const load = async () => {
+      try {
+        const data = isOwnProfile
+          ? await fetchCompletedQuests(token)
+          : await fetchCompletedQuestsByUsername(token, profileUsername);
+        setCompleted(data);
+      } catch {
+        // ignore for now
+      }
+    };
+
+    void load();
+  }, [token, profileUsername, isOwnProfile]);
 
   // load my posts for profile grid
   useEffect(() => {
@@ -453,30 +491,32 @@ export default function Profile() {
                         >
                           @{f.username}
                         </button>
-                        <button
-                          onClick={async () => {
-                            if (!token) return;
-                            try {
-                              await removeFriend(token, f.id);
-                              setFriends((prev) =>
-                                prev.filter((friend) => friend.id !== f.id)
-                              );
-                            } catch (e) {
-                              console.error("Failed to remove friend", e);
-                            }
-                          }}
-                          style={{
-                            border: "none",
-                            background: "transparent",
-                            color: "var(--muted)",
-                            cursor: "pointer",
-                            fontSize: "0.85rem",
-                          }}
-                          aria-label={`Remove @${f.username}`}
-                          title={`Remove @${f.username}`}
-                        >
-                          ✕
-                        </button>
+                        {isOwnProfile && (
+                          <button
+                            onClick={async () => {
+                              if (!token) return;
+                              try {
+                                await removeFriend(token, f.id);
+                                setFriends((prev) =>
+                                  prev.filter((friend) => friend.id !== f.id)
+                                );
+                              } catch (e) {
+                                console.error("Failed to remove friend", e);
+                              }
+                            }}
+                            style={{
+                              border: "none",
+                              background: "transparent",
+                              color: "var(--muted)",
+                              cursor: "pointer",
+                              fontSize: "0.85rem",
+                            }}
+                            aria-label={`Remove @${f.username}`}
+                            title={`Remove @${f.username}`}
+                          >
+                            ✕
+                          </button>
+                        )}
                       </div>
                     ))
                   )}
@@ -496,6 +536,7 @@ export default function Profile() {
                       sendFriendRequest(token, username);
                       setUsername("");
                     }}
+                    disabled={!isOwnProfile}
                   >
                     Send
                   </button>
@@ -531,21 +572,25 @@ export default function Profile() {
                       <div style={{ marginTop: 14, display: "flex", gap: 16 }}>
                         <button
                           onClick={async () => {
+                            if (!isOwnProfile) return;
                             if (!token) return;
                             await respondFriendRequest(token, r.id, true);
                             setRequests((rs) => rs.filter((x) => x.id !== r.id));
                             getFriends(token).then(setFriends);
                           }}
+                          disabled={!isOwnProfile}
                         >
                           Accept
                         </button>
                         <button
                           className="secondary"
                           onClick={async () => {
+                            if (!isOwnProfile) return;
                             if (!token) return;
                             await respondFriendRequest(token, r.id, false);
                             setRequests((rs) => rs.filter((x) => x.id !== r.id));
                           }}
+                          disabled={!isOwnProfile}
                         >
                           Reject
                         </button>
@@ -567,7 +612,9 @@ export default function Profile() {
                       color: "rgba(160,160,160,0.9)",
                     }}
                   >
-                    You have no badges yet. Complete shared quests to earn them.
+                    {isOwnProfile
+                      ? "You have no badges yet. Complete shared quests to earn them."
+                      : `@${profileUsername} has no badges yet.`}
                   </p>
                 ) : (
                   <div
@@ -656,6 +703,7 @@ export default function Profile() {
                       <button
                         style={{ marginLeft: 12 }}
                         onClick={async () => {
+                          if (!isOwnProfile) return;
                           if (!token) return;
                           const completedQuest = await completeQuest(token, q.id);
                           // remove from received list
@@ -679,6 +727,7 @@ export default function Profile() {
                             state: { completedQuestId: completedQuest.quest_id },
                           });
                         }}
+                        disabled={!isOwnProfile}
                       >
                         Mark Completed
                       </button>
@@ -706,7 +755,9 @@ export default function Profile() {
                     padding: "16px 12px",
                   }}
                 >
-                  Building your QuestChest...
+                  {isOwnProfile
+                    ? "Building your QuestChest..."
+                    : `Building @${profileUsername}'s QuestChest...`}
                 </div>
               ) : (
                 <div

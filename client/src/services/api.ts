@@ -82,6 +82,16 @@ export async function getFriends(token: string) {
   return res.json();
 }
 
+export async function getFriendsByUsername(token: string, username: string) {
+  const res = await fetch(
+    `${API}/friends/list/by-username/${encodeURIComponent(username)}`,
+    {
+      headers: { Authorization: `Bearer ${token}` },
+    }
+  );
+  return res.json();
+}
+
 export async function removeFriend(token: string, friendId: string) {
   const res = await fetch(`${API}/friends/${friendId}/remove`, {
     method: "POST",
@@ -143,6 +153,26 @@ export async function fetchCompletedQuests(token: string) {
       Authorization: `Bearer ${token}`,
     },
   });
+
+  if (!res.ok) {
+    throw new Error("Failed to fetch completed quests");
+  }
+
+  return res.json();
+}
+
+export async function fetchCompletedQuestsByUsername(
+  token: string,
+  username: string
+) {
+  const res = await fetch(
+    `${API}/quests/completed/by-username/${encodeURIComponent(username)}`,
+    {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    }
+  );
 
   if (!res.ok) {
     throw new Error("Failed to fetch completed quests");

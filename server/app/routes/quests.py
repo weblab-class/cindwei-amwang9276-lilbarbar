@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from ..database import SessionLocal
-from ..models import Quest, ReceivedQuest, CompletedQuest, QuestVote
+from ..models import Quest, ReceivedQuest, CompletedQuest, QuestVote, User
 from ..schemas import QuestCreate, QuestOutWithVote
 from ..security import get_current_user_id
 
@@ -176,6 +176,34 @@ def get_completed_quests(
     Return all quests that the current user has completed, including their icons and titles.
     """
     cqs = db.query(CompletedQuest).filter(CompletedQuest.user_id == user_id).all()
+    results = []
+    for cq in cqs:
+        q = db.get(Quest, cq.quest_id)
+        if q:
+            results.append(
+                {
+                    "id": cq.id,
+                    "title": q.title,
+                    "icon": q.icon,
+                }
+            )
+    return results
+
+
+@router.get("/completed/by-username/{username}")
+def get_completed_quests_by_username(
+    username: str,
+    db: Session = Depends(get_db),
+    user_id: str = Depends(get_current_user_id),  # noqa: ARG001 - ensure auth
+):
+    """
+    Return completed quests (badges) for a given username.
+    """
+    u = db.query(User).filter(User.username == username).first()
+    if not u:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    cqs = db.query(CompletedQuest).filter(CompletedQuest.user_id == u.id).all()
     results = []
     for cq in cqs:
         q = db.get(Quest, cq.quest_id)
