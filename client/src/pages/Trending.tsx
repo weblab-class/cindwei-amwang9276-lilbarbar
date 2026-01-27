@@ -16,6 +16,11 @@ export default function Trending() {
   const [quests, setQuests] = useState<Sidequest[]>([]);
   const [showModal, setShowModal] = useState(false);
   const [shareQuestId, setShareQuestId] = useState<string | null>(null);
+  const [timePeriod, setTimePeriod] = useState<"all" | "month" | "week">("all");
+
+  useEffect(() => {
+    fetchQuests(timePeriod).then(setQuests);
+  }, [timePeriod]);
   const [myVotes, setMyVotes] = useState<Record<string, Vote>>({});
 
   useEffect(() => {
@@ -49,6 +54,8 @@ export default function Trending() {
       await voteQuest(token, id, delta);
     } catch (e) {
       console.error("Failed to vote on quest:", e);
+      // Optionally reload from server if you want to fully sync:
+      fetchQuests(timePeriod).then(setQuests);
       setMyVotes((prev) => ({ ...prev, [id]: prevVote }));
       // Reload from server to fully sync:
       fetchQuests(token).then(setQuests);
@@ -92,12 +99,64 @@ export default function Trending() {
       
       {/* content */}
       <div style={{ position: "relative", zIndex: 1 }}>
-        <div style={{ display: "flex", justifyContent: "space-between" }}>
-        <h2>Trending Quests</h2>
-        <button onClick={() => setShowModal(true)} style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-          Add Quest
-        </button>
-      </div>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+          <h2 style={{ margin: 0 }}>Trending Quests</h2>
+          <button onClick={() => setShowModal(true)} style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+            Add Quest
+          </button>
+        </div>
+
+        {/* Time period filter buttons */}
+        <div style={{ display: "flex", gap: 8, marginBottom: 24 }}>
+          <button
+            onClick={() => setTimePeriod("all")}
+            style={{
+              padding: "6px 16px",
+              borderRadius: 999,
+              border: "1px solid",
+              background: timePeriod === "all" ? "var(--mint)" : "transparent",
+              color: timePeriod === "all" ? "#000" : "var(--text)",
+              borderColor: timePeriod === "all" ? "var(--mint)" : "var(--muted)",
+              cursor: "pointer",
+              fontSize: "0.85rem",
+              fontWeight: timePeriod === "all" ? 600 : 400,
+            }}
+          >
+            All Time
+          </button>
+          <button
+            onClick={() => setTimePeriod("month")}
+            style={{
+              padding: "6px 16px",
+              borderRadius: 999,
+              border: "1px solid",
+              background: timePeriod === "month" ? "var(--mint)" : "transparent",
+              color: timePeriod === "month" ? "#000" : "var(--text)",
+              borderColor: timePeriod === "month" ? "var(--mint)" : "var(--muted)",
+              cursor: "pointer",
+              fontSize: "0.85rem",
+              fontWeight: timePeriod === "month" ? 600 : 400,
+            }}
+          >
+            This Month
+          </button>
+          <button
+            onClick={() => setTimePeriod("week")}
+            style={{
+              padding: "6px 16px",
+              borderRadius: 999,
+              border: "1px solid",
+              background: timePeriod === "week" ? "var(--mint)" : "transparent",
+              color: timePeriod === "week" ? "#000" : "var(--text)",
+              borderColor: timePeriod === "week" ? "var(--mint)" : "var(--muted)",
+              cursor: "pointer",
+              fontSize: "0.85rem",
+              fontWeight: timePeriod === "week" ? 600 : 400,
+            }}
+          >
+            This Week
+          </button>
+        </div>
 
       {quests.map((q, index) => (
         <SidequestCard

@@ -1,5 +1,7 @@
 const API = import.meta.env.VITE_API_URL;
 
+export async function fetchQuests(period: "all" | "month" | "week" = "all") {
+  const res = await fetch(`${API}/quests?period=${period}`);
 export async function fetchQuests(token?: string) {
   const res = await fetch(
     token ? `${API}/quests/with_votes` : `${API}/quests`,
@@ -161,6 +163,15 @@ export async function fetchCompletedQuests(token: string) {
   return res.json();
 }
 
+export async function fetchCompletedQuestsForUser(token: string, userId: string) {
+  const res = await fetch(`${API}/quests/completed/by-user/${encodeURIComponent(userId)}`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  if (!res.ok) {
+    throw new Error("Failed to fetch completed quests for user");
 export async function fetchCompletedQuestsByUsername(
   token: string,
   username: string

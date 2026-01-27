@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import {
@@ -10,6 +10,7 @@ import {
   fetchReceivedQuests,
   completeQuest,
   fetchCompletedQuests,
+  fetchCompletedQuestsForUser,
   fetchCompletedQuestsByUsername,
   uploadPost,
   fetchMe,
@@ -27,7 +28,8 @@ import LiquidEther from "../components/LiquidEther";
 import PostModal from "../components/PostModal";
 
 interface CompletedQuest {
-  id: string;
+  id: string; // quest id (server returns quest_id as id)
+  quest_id?: string;
   title: string;
   icon: string;
 }
@@ -88,6 +90,29 @@ export default function Profile() {
 
   const fallbackCreatedAt = new Date("2026-01-27T09:00:00");
 
+  const questStatsById = useMemo(() => {
+    const map: Record<
+      string,
+      {
+        maxVotes: number;
+        count: number;
+      }
+    > = {};
+
+    for (const p of myPosts) {
+      const qid = p.quest_id;
+      if (!qid) continue;
+      const existing = map[qid] ?? { maxVotes: 0, count: 0 };
+      const votes = p.votes ?? 0;
+      existing.maxVotes = Math.max(existing.maxVotes, votes);
+      existing.count += 1;
+      map[qid] = existing;
+    }
+
+    return map;
+  }, [myPosts]);
+
+  async function handleVote(postId: string, delta: number) {
   // When switching between profiles, clear profile-specific UI state
   // so we don't flash stale data from the previous user.
   useEffect(() => {
@@ -209,10 +234,27 @@ export default function Profile() {
     fetchReceivedQuests(token).then(setReceived);
   }, [token]);
 
-  //load completed quests here NOT IMPLEMENTED TODO
+  // load completed quests / badges for the profile we're viewing
   useEffect(() => {
     if (!token || !profileUsername) return;
 
+    const loadCompleted = async () => {
+      try {
+        if (isOwnProfile) {
+          const mine = await fetchCompletedQuests(token);
+          setCompleted(mine);
+        } else {
+          const other = await fetchUserByUsername(token, profileUsername);
+          const theirs = await fetchCompletedQuestsForUser(token, other.id);
+          setCompleted(theirs);
+        }
+      } catch (e) {
+        console.error("Failed to load completed quests for profile", e);
+        setCompleted([]);
+      }
+    };
+
+    void loadCompleted();
     const load = async () => {
       try {
         const data = isOwnProfile
@@ -437,6 +479,148 @@ export default function Profile() {
                   <h2 style={{ marginTop: 0, marginBottom: 0, textAlign: "center" }}>
                     @{profileUsername}
                   </h2>
+
+                  {/* Quest badges under avatar */}
+                  <div style={{ marginTop: 16 }}>
+                    <h3
+                      style={{
+                        margin: 0,
+                        marginBottom: 8,
+                        fontSize: "0.95rem",
+                        textTransform: "uppercase",
+                        letterSpacing: "0.08em",
+                        color: "rgba(200,200,200,0.9)",
+                      }}
+                    >
+                      Quest Badges
+                    </h3>
+                    {completed.length === 0 ? (
+                      <p
+                        style={{
+                          margin: 0,
+                          fontSize: "0.85rem",
+                          color: "rgba(160,160,160,0.9)",
+                        }}
+                      >
+                        {isOwnProfile
+                          ? "You have no badges yet. Complete shared quests to earn them."
+                          : `@${profileUsername} has no badges yet.`}
+                      </p>
+                    ) : (
+                      <div
+                        style={{
+                          display: "flex",
+                          flexWrap: "wrap",
+                          gap: 20,
+                          justifyContent: "center",
+                          marginTop: 4,
+                        }}
+                      >
+                        {completed.map((c) => {
+                          const questId = c.quest_id ?? c.id;
+                          const stats = questId ? questStatsById[questId] : undefined;
+                          return (
+                            <div
+                              key={c.id}
+                              style={{
+                                position: "relative",
+                                display: "inline-flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                              }}
+                              onMouseEnter={() => setHoveredBadgeId(c.id)}
+                              onMouseLeave={() => setHoveredBadgeId(null)}
+                            >
+                              <span
+                                style={{
+                                  fontSize: "1.8rem",
+                                  filter: "drop-shadow(0 0 6px rgba(0,0,0,0.6))",
+                                  cursor: "default",
+                                }}
+                              >
+                                {c.icon}
+                              </span>
+                              {stats && (
+                                <div
+                                  style={{
+                                    position: "absolute",
+                                    top: -4,
+                                    right: -20,
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: -4,
+                                  }}
+                                >
+                                  {/* Left circle - max votes (yellow) */}
+                                  <div
+                                    style={{
+                                      width: 20,
+                                      height: 20,
+                                      borderRadius: "50%",
+                                      background: "#FFD700",
+                                      border: "1px solid rgba(255,255,255,0.3)",
+                                      display: "flex",
+                                      alignItems: "center",
+                                      justifyContent: "center",
+                                      fontSize: "0.65rem",
+                                      fontWeight: 700,
+                                      color: "#000",
+                                      boxShadow: `0 0 ${Math.min(8 + stats.maxVotes * 0.5, 20)}px rgba(255, 215, 0, ${Math.min(0.4 + stats.maxVotes * 0.02, 0.8)})`,
+                                      zIndex: 2,
+                                    }}
+                                  >
+                                    {stats.maxVotes}
+                                  </div>
+                                  {/* Right circle - count (mint) */}
+                                  <div
+                                    style={{
+                                      width: 20,
+                                      height: 20,
+                                      borderRadius: "50%",
+                                      background: "var(--mint)",
+                                      border: "1px solid rgba(255,255,255,0.3)",
+                                      display: "flex",
+                                      alignItems: "center",
+                                      justifyContent: "center",
+                                      fontSize: "0.65rem",
+                                      fontWeight: 700,
+                                      color: "#000",
+                                      boxShadow: `0 0 ${Math.min(8 + stats.count * 0.5, 20)}px rgba(0, 255, 238, ${Math.min(0.4 + stats.count * 0.02, 0.8)})`,
+                                      marginLeft: -6,
+                                      zIndex: 1,
+                                    }}
+                                  >
+                                    {stats.count}
+                                  </div>
+                                </div>
+                              )}
+                              {hoveredBadgeId === c.id && (
+                                <div
+                                  style={{
+                                    position: "absolute",
+                                    top: "120%",
+                                    left: "50%",
+                                    transform: "translateX(-50%)",
+                                    whiteSpace: "nowrap",
+                                    background: "rgba(0, 0, 0, 0.85)",
+                                    color: "rgba(255, 255, 255, 0.95)",
+                                    padding: "4px 8px",
+                                    borderRadius: 6,
+                                    fontSize: "0.75rem",
+                                    boxShadow: "0 4px 12px rgba(0,0,0,0.6)",
+                                    pointerEvents: "none",
+                                    zIndex: 10,
+                                  }}
+                                >
+                                  {c.title}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>

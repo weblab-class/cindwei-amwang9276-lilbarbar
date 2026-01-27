@@ -32,6 +32,7 @@ class Quest(Base):
     title = Column(String)
     icon = Column(String)
     votes = Column(Integer, default=0)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     creator_id = Column(String, ForeignKey("users.id"))
     creator = relationship("User", back_populates="quests")
