@@ -72,10 +72,22 @@ def incoming_requests(
         .all()
     )
 
+    # Map from_user_id -> username so the frontend can show names instead of raw IDs.
+    from_user_ids = [r.from_user_id for r in requests]
+    users = (
+        db.query(User)
+        .filter(User.id.in_(from_user_ids))
+        .all()
+        if from_user_ids
+        else []
+    )
+    user_map = {u.id: u.username for u in users}
+
     return [
         {
             "id": r.id,
             "from_user_id": r.from_user_id,
+            "from_username": user_map.get(r.from_user_id),
         }
         for r in requests
     ]
@@ -122,4 +134,38 @@ def list_friends(
     friends = db.query(User).filter(User.id.in_(friend_ids)).all()
 
     return [{"id": f.id, "username": f.username} for f in friends]
+
+
+@router.post("/{friend_id}/remove")
+def remove_friend(
+    friend_id: str,
+    db: Session = Depends(get_db),
+    user_id: str = Depends(get_current_user_id),
+):
+    """
+    Remove a friend by marking any accepted FriendRequest between the two users as rejected.
+    This keeps the simple 'accepted' status model used by list_friends.
+    """
+    requests = (
+        db.query(FriendRequest)
+        .filter(
+            (
+                (FriendRequest.from_user_id == user_id) & (FriendRequest.to_user_id == friend_id)
+            )
+            | (
+                (FriendRequest.from_user_id == friend_id) & (FriendRequest.to_user_id == user_id)
+            ),
+            FriendRequest.status == "accepted",
+        )
+        .all()
+    )
+
+    if not requests:
+        raise HTTPException(404, "Friend relationship not found")
+
+    for r in requests:
+        r.status = "rejected"
+    db.commit()
+
+    return {"ok": True}
 

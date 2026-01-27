@@ -77,6 +77,18 @@ export async function getFriends(token: string) {
   return res.json();
 }
 
+export async function removeFriend(token: string, friendId: string) {
+  const res = await fetch(`${API}/friends/${friendId}/remove`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) {
+    const txt = await res.text();
+    throw new Error(txt || "Failed to remove friend");
+  }
+  return res.json();
+}
+
 
 export async function fetchReceivedQuests(token: string) {
   const res = await fetch(`${API}/quests/received`, {
@@ -194,6 +206,22 @@ export async function votePost(
   return res.json();
 }
 
+export async function deletePost(token: string, postId: string) {
+  const res = await fetch(`${API}/posts/${postId}`, {
+    method: "DELETE",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  if (!res.ok) {
+    const txt = await res.text();
+    throw new Error(txt || "Failed to delete post");
+  }
+
+  return res.json();
+}
+
 export async function fetchComments(token: string, postId: string) {
   const res = await fetch(`${API}/posts/${postId}/comments`, {
     headers: {
@@ -240,6 +268,20 @@ export async function fetchMe(token: string) {
 
   if (!res.ok) {
     throw new Error("Failed to fetch current user");
+  }
+
+  return res.json();
+}
+
+export async function fetchUserByUsername(token: string, username: string) {
+  const res = await fetch(`${API}/users/by-username/${encodeURIComponent(username)}`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  if (!res.ok) {
+    throw new Error("Failed to fetch user profile");
   }
 
   return res.json();

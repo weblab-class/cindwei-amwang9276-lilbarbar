@@ -117,3 +117,23 @@ async def upload_pfp(
     url = _signed_pfp_url(key)
     return {"pfp_url": url}
 
+
+@router.get("/by-username/{username}")
+def get_user_by_username(
+    username: str,
+    db: Session = Depends(get_db),
+    user_id: str = Depends(get_current_user_id),  # noqa: ARG001 - ensure auth
+):
+    """
+    Fetch a user's public profile info (id, username, pfp URL) by username.
+    """
+    user = db.query(User).filter(User.username == username).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    return {
+        "id": user.id,
+        "username": user.username,
+        "pfp_url": _signed_pfp_url(user.pfp_key),
+    }
+

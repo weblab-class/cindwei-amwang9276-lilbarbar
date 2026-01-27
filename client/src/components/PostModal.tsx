@@ -5,9 +5,10 @@ import { fetchQuests } from "../services/api";
 interface Props {
   onClose: () => void;
   onSubmit: (file: File, questId: string) => Promise<void>;
+  initialQuestId?: string;
 }
 
-export default function PostModal({ onClose, onSubmit }: Props) {
+export default function PostModal({ onClose, onSubmit, initialQuestId }: Props) {
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [quests, setQuests] = useState<Sidequest[]>([]);
@@ -19,8 +20,17 @@ export default function PostModal({ onClose, onSubmit }: Props) {
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    fetchQuests().then(setQuests);
-  }, []);
+    fetchQuests().then((qs) => {
+      setQuests(qs);
+      if (initialQuestId) {
+        const match = qs.find((q) => q.id === initialQuestId);
+        if (match) {
+          setSelectedQuestId(match.id);
+          setSearchQuery(match.title);
+        }
+      }
+    });
+  }, [initialQuestId]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {

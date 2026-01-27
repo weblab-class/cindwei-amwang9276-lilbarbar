@@ -39,8 +39,11 @@ class PostOut(BaseModel):
     media_url: str
     media_type: str
     votes: int
+    created_at: str | None = None
     quest_title: str | None = None
     quest_icon: str | None = None
+    poster_username: str | None = None
+    poster_pfp_url: str | None = None
 
 
 class CommentCreate(BaseModel):
@@ -52,5 +55,6 @@ class CommentOut(BaseModel):
   post_id: str
   user_id: str
   username: str | None = None
+  pfp_url: str | None = None
   content: str
   created_at: str | None = None

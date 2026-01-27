@@ -7,4 +7,6 @@ export interface Post {
   media_type: 'image' | 'video';
   votes: number;
   created_at?: string;
+  poster_username?: string | null;
+  poster_pfp_url?: string | null;
 }
