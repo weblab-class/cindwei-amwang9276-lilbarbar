@@ -95,7 +95,6 @@ export default function Trending() {
         <div style={{ display: "flex", justifyContent: "space-between" }}>
         <h2>Trending Quests</h2>
         <button onClick={() => setShowModal(true)} style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-          <img src="/images/compass.svg" alt="" width={40} height={40} />
           Add Quest
         </button>
       </div>

@@ -328,52 +328,70 @@ export default function Login() {
 
         <div className="ocean-spacer" />
 
-        {/* login ui */}
+        {/* login ui + logo */}
         <div
           className="login-overlay"
           style={{
             position: "fixed",
-            top: 0,
-            right: 0,
-            padding: "1.5rem",
+            top: 16,
+            right: 16,
+            padding: "1.75rem",
             zIndex: 10,
             opacity: isScrolling ? 0 : 1,
             transition: "opacity 0.5s",
           }}
         >
-          <div className="login-form">
-            <input
-              placeholder="username"
-              value={username}
-              onChange={(e) => {
-                setUsername(e.target.value);
-                if (errorMessage) setErrorMessage(null);
+          <div style={{ position: "relative", display: "inline-block" }}>
+            {/* Logo slightly left and below the form */}
+            <img
+              src="/logo.svg"
+              alt="Sidequest logo"
+              style={{
+                position: "absolute",
+                top: 30,
+                left: -350,
+                width: 400,
+                height: "auto",
+                opacity: 0.9,
+                pointerEvents: "none",
+                // filter: "drop-shadow(0 0 12px rgba(0,0,0,0.6))",
               }}
             />
-            <input
-              placeholder="password"
-              type="password"
-              value={password}
-              onChange={(e) => {
-                setPassword(e.target.value);
-                if (errorMessage) setErrorMessage(null);
-              }}
-            />
-            {errorMessage && (
-              <div
-                style={{
-                  color: "rgba(255, 120, 120, 0.95)",
-                  fontSize: "0.8rem",
-                  marginTop: "0.25rem",
-                  maxWidth: 280,
+
+            <div className="login-form">
+              <input
+                placeholder="username"
+                value={username}
+                onChange={(e) => {
+                  setUsername(e.target.value);
+                  if (errorMessage) setErrorMessage(null);
                 }}
-              >
-                {errorMessage}
+              />
+              <input
+                placeholder="password"
+                type="password"
+                value={password}
+                onChange={(e) => {
+                  setPassword(e.target.value);
+                  if (errorMessage) setErrorMessage(null);
+                }}
+              />
+              {errorMessage && (
+                <div
+                  style={{
+                    color: "rgba(255, 120, 120, 0.95)",
+                    fontSize: "0.8rem",
+                    marginTop: "0.25rem",
+                    maxWidth: 280,
+                  }}
+                >
+                  {errorMessage}
+                </div>
+              )}
+              <div className="login-buttons">
+                <button onClick={handleLogin}>Login</button>
+                <button className="secondary" onClick={handleSignup}>Signup</button>
               </div>
-            )}
-            <div className="login-buttons">
-              <button onClick={handleLogin}>Login</button>
-              <button className="secondary" onClick={handleSignup}>Signup</button>
             </div>
           </div>
         </div>

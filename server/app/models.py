@@ -19,6 +19,8 @@ class User(Base):
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
     username = Column(String, unique=True, index=True)
     password = Column(String)
+    # Cloudflare R2 profile picture object key (used to derive signed URL)
+    pfp_key = Column(String, nullable=True)
 
     quests = relationship("Quest", back_populates="creator")
 

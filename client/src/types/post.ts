@@ -8,4 +8,6 @@ export interface Post {
   votes: number;
   my_vote?: -1 | 0 | 1;
   created_at?: string;
+  poster_username?: string | null;
+  poster_pfp_url?: string | null;
 }

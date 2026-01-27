@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { useLocation } from "react-router-dom";
 import LiquidEther from "../components/LiquidEther";
 import PostModal from "../components/PostModal";
 import PostCard from "../components/PostCard";
@@ -11,6 +12,10 @@ type Vote = -1 | 0 | 1;
 
 export default function Home() {
   const { token } = useAuth();
+  const location = useLocation();
+  const completedQuestIdFromProfile =
+    (location.state as { completedQuestId?: string } | null)?.completedQuestId ??
+    null;
   const [posts, setPosts] = useState<Post[]>([]);
   const [showPostModal, setShowPostModal] = useState(false);
   const [selectedPost, setSelectedPost] = useState<Post | null>(null);
@@ -18,20 +23,43 @@ export default function Home() {
   const [newComment, setNewComment] = useState("");
   const [myVotes, setMyVotes] = useState<Record<string, Vote>>({});
 
-  const loadPosts = useCallback(async () => {
+  const [initialQuestForPostModal, setInitialQuestForPostModal] = useState<
+    string | null
+  >(completedQuestIdFromProfile);
+  const [showUploadSuccess, setShowUploadSuccess] = useState(false);
+
+  useEffect(() => {
+    if (token) {
+      loadPosts();
+    }
+  }, [token]);
+
+  // If we navigated here from Profile after completing a quest, auto-open the post modal
+  useEffect(() => {
+    if (token && completedQuestIdFromProfile) {
+      setInitialQuestForPostModal(completedQuestIdFromProfile);
+      setShowPostModal(true);
+    }
+  }, [token, completedQuestIdFromProfile]);
+
+  useEffect(() => {
+    if (!showUploadSuccess) return;
+    const timer = setTimeout(() => setShowUploadSuccess(false), 2500);
+    return () => clearTimeout(timer);
+  }, [showUploadSuccess]);
+
+  async function loadPosts() {
     if (!token) return;
     try {
       const allPosts = (await fetchPosts(token)) as Post[];
       
       // Get top 5 most upvoted posts
       const topPosts = [...allPosts]
-        .sort((a, b) => b.votes - a.votes)
+        .sort((a: Post, b: Post) => b.votes - a.votes)
         .slice(0, 5);
 
       // Get 5 random posts (excluding top posts)
-      const remainingPosts = allPosts.filter(
-        (p) => !topPosts.some((tp) => tp.id === p.id)
-      );
+      const remainingPosts = allPosts.filter((p: Post) => !topPosts.some((tp) => tp.id === p.id));
       const randomPosts = [...remainingPosts]
         .sort(() => Math.random() - 0.5)
         .slice(0, 5);
@@ -65,6 +93,7 @@ export default function Home() {
     }
     await uploadPost(token, file, questId);
     await loadPosts();
+    setShowUploadSuccess(true);
   }
 
   async function handleVote(postId: string, direction: 1 | -1) {
@@ -157,9 +186,9 @@ export default function Home() {
           <button 
             onClick={() => setShowPostModal(true)} 
             className="float-bob"
-            style={{ display: "flex", alignItems: "center", gap: "1rem", padding: "0.8em 1.6em", fontWeight: 700, fontSize: "1rem", animationDelay: "0.5s" }}
+            style={{ display: "flex", alignItems: "center", gap: "2rem", padding: "1.5em 2em", fontWeight: 700, fontSize: "1rem", animationDelay: "0.5s" }}
           >
-            <span>📸</span>
+      
             Post
           </button>
         </div>
@@ -167,7 +196,7 @@ export default function Home() {
         {/* Masonry-style posts (4 columns, variable card heights) */}
         {posts.length === 0 ? (
           <div style={{ textAlign: "center", padding: "48px", color: "var(--muted)" }}>
-            No posts yet. Be the first to post!
+            Loading posts...
           </div>
         ) : (
           <div
@@ -194,10 +223,35 @@ export default function Home() {
         )}
       </div>
 
+      {showUploadSuccess && (
+        <div
+          style={{
+            position: "fixed",
+            bottom: 24,
+            left: "50%",
+            transform: "translateX(-50%)",
+            background: "rgba(0, 0, 0, 0.9)",
+            color: "var(--text)",
+            padding: "10px 16px",
+            borderRadius: 999,
+            border: "1px solid var(--mint)",
+            fontSize: "0.9rem",
+            zIndex: 1100,
+            boxShadow: "0 10px 30px rgba(0,0,0,0.7)",
+          }}
+        >
+          Successfully uploaded!
+        </div>
+      )}
+
       {showPostModal && (
         <PostModal
-          onClose={() => setShowPostModal(false)}
+          onClose={() => {
+            setShowPostModal(false);
+            setInitialQuestForPostModal(null);
+          }}
           onSubmit={handleUpload}
+          initialQuestId={initialQuestForPostModal ?? undefined}
         />
       )}
 
@@ -442,25 +496,68 @@ export default function Home() {
                     No comments yet. Be the first to comment.
                   </div>
                 ) : (
-                  comments.map((c) => (
-                    <div
-                      key={c.id}
-                      style={{
-                        marginBottom: 8,
-                        fontSize: "0.85rem",
-                      }}
-                    >
-                      <span
+                  comments.map((c) => {
+                    const displayName = c.username ?? "anon";
+                    const initial = displayName[0]?.toUpperCase() ?? "?";
+                    return (
+                      <div
+                        key={c.id}
                         style={{
-                          fontWeight: 600,
-                          marginRight: 4,
+                          marginBottom: 8,
+                          fontSize: "0.85rem",
+                          display: "flex",
+                          alignItems: "flex-start",
+                          gap: 8,
                         }}
                       >
-                        {c.username ?? "anon"}:
-                      </span>
-                      <span>{c.content}</span>
-                    </div>
-                  ))
+                        <div
+                          style={{
+                            width: 24,
+                            height: 24,
+                            borderRadius: "50%",
+                            background: c.pfp_url
+                              ? "transparent"
+                              : "rgba(255,255,255,0.12)",
+                            border: "1px solid rgba(255,255,255,0.28)",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            fontSize: "0.65rem",
+                            fontWeight: 700,
+                            color: "rgba(255,255,255,0.9)",
+                            overflow: "hidden",
+                            flexShrink: 0,
+                          }}
+                        >
+                          {c.pfp_url ? (
+                            <img
+                              src={c.pfp_url}
+                              alt={`${displayName} avatar`}
+                              style={{
+                                width: "100%",
+                                height: "100%",
+                                objectFit: "cover",
+                                display: "block",
+                              }}
+                            />
+                          ) : (
+                            initial
+                          )}
+                        </div>
+                        <div>
+                          <span
+                            style={{
+                              fontWeight: 600,
+                              marginRight: 4,
+                            }}
+                          >
+                            {displayName}:
+                          </span>
+                          <span>{c.content}</span>
+                        </div>
+                      </div>
+                    );
+                  })
                 )}
               </div>
 

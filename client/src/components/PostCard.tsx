@@ -159,20 +159,78 @@ export default function PostCard({ post, myVote = 0, onVote, onOpen }: Props) {
       </div>
 
       {/* Quest Info */}
-      {post.quest_title && (
+      {(post.quest_title || post.poster_username) && (
         <div
           style={{
             padding: 12,
             borderBottom: "1px solid var(--muted)",
             display: "flex",
-            alignItems: "center",
-            gap: 8,
+            flexDirection: "column",
+            gap: 4,
           }}
         >
-          <span style={{ fontSize: "1.2rem" }}>{post.quest_icon}</span>
-          <span style={{ fontSize: "0.9rem", color: "var(--text)" }}>
-            {post.quest_title}
-          </span>
+          {post.quest_title && (
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+              }}
+            >
+              <span style={{ fontSize: "1.2rem" }}>{post.quest_icon}</span>
+              <span style={{ fontSize: "0.9rem", color: "var(--text)" }}>
+                {post.quest_title}
+              </span>
+            </div>
+          )}
+
+          {post.poster_username && (
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
+                fontSize: "0.8rem",
+                color: "var(--muted)",
+              }}
+            >
+              <div
+                style={{
+                  width: 20,
+                  height: 20,
+                  borderRadius: "50%",
+                  overflow: "hidden",
+                  border: "1px solid rgba(255,255,255,0.24)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  flexShrink: 0,
+                  background: post.poster_pfp_url
+                    ? "transparent"
+                    : "rgba(255,255,255,0.08)",
+                  fontSize: "0.7rem",
+                  fontWeight: 600,
+                  color: "rgba(255,255,255,0.9)",
+                }}
+              >
+                {post.poster_pfp_url ? (
+                  <img
+                    src={post.poster_pfp_url}
+                    alt={`${post.poster_username} avatar`}
+                    style={{
+                      width: "100%",
+                      height: "100%",
+                      objectFit: "cover",
+                      display: "block",
+                    }}
+                  />
+                ) : (
+                  post.poster_username[0]?.toUpperCase() ?? "?"
+                )}
+              </div>
+              <span>Posted by @{post.poster_username}</span>
+            </div>
+          )}
         </div>
       )}
     </div>

@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from ..database import SessionLocal
 from ..models import Post, Quest, PostComment, User, PostVote
+from ..routes.users import _signed_pfp_url
 from ..schemas import PostCreate, PostOut, CommentCreate, CommentOut
 from ..security import get_current_user_id
 
@@ -83,6 +84,7 @@ def list_posts(
     results: list[PostOut] = []
     for p in posts:
         quest = db.get(Quest, p.quest_id)
+        user = db.get(User, p.user_id) if p.user_id else None
         # For private R2, we store the object key in Post.media_url and return a signed URL here.
         signed_url = _signed_get_url(p.media_url)
         results.append(
@@ -92,8 +94,11 @@ def list_posts(
                 media_url=signed_url,
                 media_type=p.media_type,
                 votes=p.votes,
+                created_at=p.created_at.isoformat() if p.created_at else None,
                 quest_title=quest.title if quest else None,
                 quest_icon=quest.icon if quest else None,
+                poster_username=user.username if user else None,
+                poster_pfp_url=_signed_pfp_url(user.pfp_key) if user else None,
                 my_vote=vote_map.get(p.id, 0),
             )
         )
@@ -125,15 +130,19 @@ def create_post(
 
     # If client uses this route directly, assume media_url is a key for private R2.
     signed_url = _signed_get_url(post.media_url)
+    user = db.get(User, user_id)
     return PostOut(
         id=post.id,
         quest_id=post.quest_id,
         media_url=signed_url,
         media_type=post.media_type,
         votes=post.votes,
+        created_at=post.created_at.isoformat() if post.created_at else None,
         quest_title=quest.title,
         quest_icon=quest.icon,
         my_vote=0,
+        poster_username=user.username if user else None,
+        poster_pfp_url=_signed_pfp_url(user.pfp_key) if user else None,
     )
 
 
@@ -200,15 +209,19 @@ async def upload_post(
     db.refresh(post)
 
     signed_url = _signed_get_url(key)
+    user = db.get(User, user_id)
     return PostOut(
         id=post.id,
         quest_id=post.quest_id,
         media_url=signed_url,
         media_type=post.media_type,
         votes=post.votes,
+        created_at=post.created_at.isoformat() if post.created_at else None,
         quest_title=quest.title,
         quest_icon=quest.icon,
         my_vote=0,
+        poster_username=user.username if user else None,
+        poster_pfp_url=_signed_pfp_url(user.pfp_key) if user else None,
     )
 
 
@@ -254,15 +267,19 @@ def vote_post(
 
     quest = db.get(Quest, post.quest_id)
     signed_url = _signed_get_url(post.media_url)
+    user = db.get(User, post.user_id) if post.user_id else None
     return PostOut(
         id=post.id,
         quest_id=post.quest_id,
         media_url=signed_url,
         media_type=post.media_type,
         votes=post.votes,
+        created_at=post.created_at.isoformat() if post.created_at else None,
         quest_title=quest.title if quest else None,
         quest_icon=quest.icon if quest else None,
         my_vote=next_value,
+        poster_username=user.username if user else None,
+        poster_pfp_url=_signed_pfp_url(user.pfp_key) if user else None,
     )
 
 
@@ -292,6 +309,7 @@ def list_comments(
                 post_id=c.post_id,
                 user_id=c.user_id,
                 username=user.username if user else None,
+                pfp_url=_signed_pfp_url(user.pfp_key) if user else None,
                 content=c.content,
                 created_at=c.created_at.isoformat() if c.created_at else None,
             )
@@ -328,7 +346,53 @@ def create_comment(
         post_id=comment.post_id,
         user_id=comment.user_id,
         username=user.username if user else None,
+        pfp_url=_signed_pfp_url(user.pfp_key) if user else None,
         content=comment.content,
         created_at=comment.created_at.isoformat() if comment.created_at else None,
     )
+
+
+@router.delete("/{post_id}")
+def delete_post(
+    post_id: str,
+    db: Session = Depends(get_db),
+    user_id: str = Depends(get_current_user_id),
+):
+    """
+    Delete a post owned by the current user (and its comments).
+    """
+    post = db.get(Post, post_id)
+    if not post:
+        raise HTTPException(status_code=404, detail="Post not found")
+    if post.user_id != user_id:
+        raise HTTPException(status_code=403, detail="Not allowed to delete this post")
+
+    # Delete comments first to satisfy FK constraints.
+    db.query(PostComment).filter(PostComment.post_id == post_id).delete()
+    db.delete(post)
+    db.commit()
+
+    return {"ok": True}
+
+
+@router.post("/backfill_user_cin")
+def backfill_posts_to_cin(
+    db: Session = Depends(get_db),
+):
+    """
+    One-off helper to assign all posts without a user_id to the user 'cin'.
+    Run this once to preserve old anonymous posts.
+    """
+    user = db.query(User).filter(User.username == "cin").first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User 'cin' not found")
+
+    posts = db.query(Post).filter(Post.user_id.is_(None)).all()
+    updated = 0
+    for p in posts:
+        p.user_id = user.id
+        updated += 1
+    db.commit()
+
+    return {"updated": updated}
 
