@@ -9,7 +9,7 @@ import {
   fetchReceivedQuests,
   completeQuest,
   fetchCompletedQuests,
-  uploadPost,,
+  uploadPost,
   fetchMe,
   fetchUserByUsername,
   fetchComments,
