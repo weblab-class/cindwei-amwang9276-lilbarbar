@@ -597,40 +597,123 @@ export default function Profile() {
 
             {/* FULL WIDTH: completed quests */}
             <div style={{ gridColumn: "1 / -1" }}>
-              <h3 style={{ marginTop: 4 }}>Your Completed Quests</h3>
-              {completed.length === 0 && (
+              <h3 style={{ marginTop: 4 }}>
+                {isOwnProfile ? "Your Posts" : `@${profileUsername}'s Posts`}
+              </h3>
+              {myPosts.length === 0 ? (
                 <div
                   style={{
                     width: "100%",
-                    minHeight: "35vh",
+                    minHeight: "20vh",
                     display: "flex",
-                    flexDirection: "column",
                     alignItems: "center",
                     justifyContent: "center",
                     textAlign: "center",
                     color: "rgba(180, 180, 180, 0.9)",
-                    padding: "24px 12px",
+                    padding: "16px 12px",
                   }}
                 >
-                  <div>No completed quests yet, add your first to your quest chest!</div>
-
-                  <button
-                    onClick={() => setShowPostModal(true)}
-                    style={{
-                      marginTop: 16,
-                      display: "inline-flex",
-                      alignItems: "center",
-                      gap: "0.5rem",
-                    }}
-                  >
-                    <span>📸</span>
-                    Post
-                  </button>
+                  Building your QuestChest...
+                </div>
+              ) : (
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))",
+                    gap: 12,
+                    marginTop: 8,
+                  }}
+                >
+                  {myPosts.map((p) => (
+                    <div
+                      key={p.id}
+                      onMouseEnter={() => setHoveredPostId(p.id)}
+                      onMouseLeave={() => setHoveredPostId((prev) => (prev === p.id ? null : prev))}
+                      onClick={async () => {
+                        setSelectedPost(p);
+                        setComments([]);
+                        setNewComment("");
+                        await loadCommentsForPost(p.id);
+                      }}
+                      style={{
+                        background: "var(--panel)",
+                        borderRadius: 10,
+                        overflow: "hidden",
+                        border: "1px solid rgba(255,255,255,0.06)",
+                        position: "relative",
+                        transform:
+                          hoveredPostId === p.id
+                            ? "translateY(-6px) scale(1.03)"
+                            : "translateY(0) scale(1)",
+                        boxShadow:
+                          hoveredPostId === p.id
+                            ? "0 16px 36px rgba(0,0,0,0.55)"
+                            : "0 4px 10px rgba(0,0,0,0.3)",
+                        transition: "transform 160ms ease-out, box-shadow 160ms ease-out",
+                        cursor: "pointer",
+                      }}
+                    >
+                      {p.media_type === "video" ? (
+                        <video
+                          src={p.media_url}
+                          style={{
+                            width: "100%",
+                            height: 160,
+                            objectFit: "cover",
+                            display: "block",
+                          }}
+                          muted
+                          loop
+                          autoPlay
+                          playsInline
+                        />
+                      ) : (
+                        <img
+                          src={p.media_url}
+                          alt={p.quest_title || "Post"}
+                          style={{
+                            width: "100%",
+                            height: 160,
+                            objectFit: "cover",
+                            display: "block",
+                          }}
+                        />
+                      )}
+                      {hoveredPostId === p.id && p.quest_title && (
+                        <div
+                          style={{
+                            position: "absolute",
+                            left: 0,
+                            right: 0,
+                            bottom: 0,
+                            padding: "6px 8px",
+                            background:
+                              "linear-gradient(to top, rgba(0,0,0,0.85), rgba(0,0,0,0.3))",
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 6,
+                            fontSize: "0.8rem",
+                            color: "rgba(255,255,255,0.96)",
+                          }}
+                        >
+                          {p.quest_icon && (
+                            <span style={{ fontSize: "1rem" }}>{p.quest_icon}</span>
+                          )}
+                          <span
+                            style={{
+                              overflow: "hidden",
+                              textOverflow: "ellipsis",
+                              whiteSpace: "nowrap",
+                            }}
+                          >
+                            {p.quest_title}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  ))}
                 </div>
               )}
-              {completed.map((c) => (
-                <div key={c.id}>{c.title}</div>
-              ))}
             </div>
           </div>
         </div>
