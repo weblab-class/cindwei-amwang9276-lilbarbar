@@ -28,12 +28,6 @@ export default function Home() {
   >(completedQuestIdFromProfile);
   const [showUploadSuccess, setShowUploadSuccess] = useState(false);
 
-  useEffect(() => {
-    if (token) {
-      loadPosts();
-    }
-  }, [token]);
-
   // If we navigated here from Profile after completing a quest, auto-open the post modal
   useEffect(() => {
     if (token && completedQuestIdFromProfile) {
@@ -48,21 +42,17 @@ export default function Home() {
     return () => clearTimeout(timer);
   }, [showUploadSuccess]);
 
-  async function loadPosts() {
+  const loadPosts = useCallback(async () => {
     if (!token) return;
     try {
       const allPosts = (await fetchPosts(token)) as Post[];
-      
+
       // Get top 5 most upvoted posts
-      const topPosts = [...allPosts]
-        .sort((a: Post, b: Post) => b.votes - a.votes)
-        .slice(0, 5);
+      const topPosts = [...allPosts].sort((a, b) => b.votes - a.votes).slice(0, 5);
 
       // Get 5 random posts (excluding top posts)
-      const remainingPosts = allPosts.filter((p: Post) => !topPosts.some((tp) => tp.id === p.id));
-      const randomPosts = [...remainingPosts]
-        .sort(() => Math.random() - 0.5)
-        .slice(0, 5);
+      const remainingPosts = allPosts.filter((p) => !topPosts.some((tp) => tp.id === p.id));
+      const randomPosts = [...remainingPosts].sort(() => Math.random() - 0.5).slice(0, 5);
 
       // Combine: top 5 + random 5 (or less if not enough posts)
       const displayPosts = [...topPosts, ...randomPosts].slice(0, 10);
