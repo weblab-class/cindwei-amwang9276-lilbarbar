@@ -22,6 +22,7 @@ export default function Home() {
   const [initialQuestForPostModal, setInitialQuestForPostModal] = useState<
     string | null
   >(completedQuestIdFromProfile);
+  const [questSearch, setQuestSearch] = useState("");
   const [showUploadSuccess, setShowUploadSuccess] = useState(false);
 
   useEffect(() => {
@@ -119,6 +120,16 @@ export default function Home() {
     }
   }
 
+  const filteredPosts =
+    questSearch.trim().length === 0
+      ? posts
+      : posts.filter((p) => {
+          const needle = questSearch.trim().toLowerCase();
+          const questTitle = (p.quest_title || "").toLowerCase();
+          const username = (p.poster_username || "").toLowerCase();
+          return questTitle.includes(needle) || username.includes(needle);
+        });
+
   return (
     <div
       className="page-fade-in"
@@ -153,22 +164,63 @@ export default function Home() {
       
       {/* content */}
       <div style={{ position: "relative", zIndex: 1 }}>
-        {/* Header with Post button */}
-        <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 24 }}>
-          <button 
-            onClick={() => setShowPostModal(true)} 
-            className="float-bob"
-            style={{ display: "flex", alignItems: "center", gap: "2rem", padding: "1.5em 2em", fontWeight: 700, fontSize: "1rem", animationDelay: "0.5s" }}
+        {/* Header with Post button + quest search */}
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            gap: 16,
+            marginBottom: 24,
+          }}
+        >
+          <div
+            style={{
+              flex: 1,
+              maxWidth: 320,
+            }}
           >
-      
-            Post
-          </button>
+            <input
+              type="text"
+              placeholder="Search by quest or user..."
+              value={questSearch}
+              onChange={(e) => setQuestSearch(e.target.value)}
+              style={{
+                width: "100%",
+                padding: "0.6em 0.9em",
+                borderRadius: 999,
+                border: "1px solid var(--muted)",
+                background: "rgba(0,0,0,0.65)",
+                color: "var(--text)",
+                fontSize: "0.9rem",
+              }}
+            />
+          </div>
+          <div>
+            <button
+              onClick={() => setShowPostModal(true)}
+              className="float-bob"
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "2rem",
+                padding: "1.5em 2em",
+                fontWeight: 700,
+                fontSize: "1rem",
+                animationDelay: "0.5s",
+              }}
+            >
+              Post
+            </button>
+          </div>
         </div>
 
         {/* Masonry-style posts (4 columns, variable card heights) */}
-        {posts.length === 0 ? (
+        {filteredPosts.length === 0 ? (
           <div style={{ textAlign: "center", padding: "48px", color: "var(--muted)" }}>
-            Loading posts...
+            {posts.length === 0 && questSearch.trim().length === 0
+              ? "Loading posts..."
+              : "No posts match this quest search."}
           </div>
         ) : (
           <div
@@ -177,7 +229,7 @@ export default function Home() {
               columnGap: "16px",
             }}
           >
-            {posts.map((post) => (
+            {filteredPosts.map((post) => (
               <PostCard
                 key={post.id}
                 post={post}

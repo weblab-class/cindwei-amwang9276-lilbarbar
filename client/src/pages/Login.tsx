@@ -375,9 +375,9 @@ export default function Login() {
               alt="Sidequest logo"
               style={{
                 position: "absolute",
-                top: 30,
-                left: -350,
-                width: 400,
+                top: 20,
+                left: -520,
+                width: 600,
                 height: "auto",
                 opacity: 0.9,
                 pointerEvents: "none",

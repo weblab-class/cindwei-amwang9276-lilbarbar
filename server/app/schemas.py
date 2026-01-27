@@ -25,6 +25,7 @@ class QuestOut(BaseModel):
     title: str
     icon: str
     votes: int
+    created_at: str | None = None
 
 
 class PostCreate(BaseModel):
