@@ -229,3 +229,38 @@ export async function createComment(
 
   return res.json();
 }
+
+// User / profile APIs
+export async function fetchMe(token: string) {
+  const res = await fetch(`${API}/users/me`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  if (!res.ok) {
+    throw new Error("Failed to fetch current user");
+  }
+
+  return res.json();
+}
+
+export async function uploadProfilePicture(token: string, file: File) {
+  const form = new FormData();
+  form.append("file", file);
+
+  const res = await fetch(`${API}/users/me/pfp`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+    body: form,
+  });
+
+  if (!res.ok) {
+    const txt = await res.text();
+    throw new Error(txt || "Failed to upload profile picture");
+  }
+
+  return res.json();
+}

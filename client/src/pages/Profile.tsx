@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useAuth } from "../context/AuthContext";
 import {
   sendFriendRequest,
@@ -7,7 +7,9 @@ import {
   getFriends,
   fetchReceivedQuests,
   completeQuest,
-  fetchCompletedQuests
+  fetchCompletedQuests,
+  fetchMe,
+  uploadProfilePicture,
 } from "../services/api";
 import LiquidEther from "../components/LiquidEther";
 
@@ -45,13 +47,28 @@ export default function Profile() {
   const [requests, setRequests] = useState<FriendRequest[]>([]);
   const [friends, setFriends] = useState<Friend[]>([]);
   const [received, setReceived] = useState<ReceivedQuest[]>([]);
-  
   const [completed, setCompleted] = useState<CompletedQuest[]>([]);
+  const [pfpUrl, setPfpUrl] = useState<string | null>(null);
+  const [isUploadingPfp, setIsUploadingPfp] = useState(false);
+  const [showPfpDialog, setShowPfpDialog] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   // incoming friend requests
   useEffect(() => {
     if (!token) return;
     getIncomingRequests(token).then(setRequests);
+  }, [token]);
+
+  // load own profile (pfp)
+    useEffect(() => {
+    if (!token) return;
+    fetchMe(token)
+      .then((me) => {
+        if (me?.pfp_url) setPfpUrl(me.pfp_url);
+      })
+      .catch(() => {
+        // ignore for now
+      });
   }, [token]);
 
   // friends list
@@ -129,14 +146,17 @@ export default function Profile() {
                     textAlign: "center",
                   }}
                 >
-                  {/* temporary profile picture placeholder */}
+                  {/* profile picture (clickable to upload) */}
                   <div
                     aria-label="Profile picture"
+                    onClick={() => setShowPfpDialog(true)}
                     style={{
                       width: 240,
                       height: 240,
                       borderRadius: "50%",
-                      background: "rgba(255,255,255,0.08)",
+                      background: pfpUrl
+                        ? "transparent"
+                        : "rgba(255,255,255,0.08)",
                       border: "2px solid rgba(255,255,255,0.18)",
                       display: "flex",
                       alignItems: "center",
@@ -145,10 +165,58 @@ export default function Profile() {
                       fontSize: 34,
                       color: "rgba(255,255,255,0.9)",
                       userSelect: "none",
+                      cursor: "pointer",
+                      overflow: "hidden",
                     }}
                   >
-                    {(user.username?.[0] ?? "?").toUpperCase()}
+                    {pfpUrl ? (
+                      <img
+                        src={pfpUrl}
+                        alt={`${user.username} profile`}
+                        style={{
+                          width: "100%",
+                          height: "100%",
+                          objectFit: "cover",
+                          display: "block",
+                        }}
+                      />
+                    ) : (
+                      (user.username?.[0] ?? "?").toUpperCase()
+                    )}
                   </div>
+
+                  {isUploadingPfp && (
+                    <div
+                      style={{
+                        fontSize: "0.8rem",
+                        color: "rgba(200, 200, 200, 0.9)",
+                      }}
+                    >
+                      Updating profile picture...
+                    </div>
+                  )}
+
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    style={{ display: "none" }}
+                    onChange={async (e) => {
+                      const file = e.target.files?.[0];
+                      if (!file || !token) return;
+                      setIsUploadingPfp(true);
+                      try {
+                        const res = await uploadProfilePicture(token, file);
+                        if (res?.pfp_url) setPfpUrl(res.pfp_url);
+                        setShowPfpDialog(false);
+                      } catch (err) {
+                        console.error("Failed to upload profile picture:", err);
+                      } finally {
+                        setIsUploadingPfp(false);
+                        e.target.value = "";
+                      }
+                    }}
+                  />
 
                   <h2 style={{ marginTop: 0, marginBottom: 0, textAlign: "center" }}>
                     @{user.username}
@@ -164,97 +232,97 @@ export default function Profile() {
 
               {/* RIGHT: friends + add friend + incoming friend requests */}
               <div style={{ width: 340, minWidth: 320 }}>
-              {/* friends */}
+      {/* friends */}
               <h3 style={{ marginTop: 0 }}>Friends</h3>
-              {friends.length === 0 && <p>No friends yet</p>}
-              {friends.map((f) => (
-                <div key={f.id}>@{f.username}</div>
-              ))}
+      {friends.length === 0 && <p>No friends yet</p>}
+      {friends.map((f) => (
+        <div key={f.id}>@{f.username}</div>
+      ))}
 
-              {received.map((q) => (
-                <div
-                  key={q.id}
-                  style={{
-                    background: "var(--panel)",
-                    padding: 12,
-                    borderRadius: 8,
-                    marginBottom: 8,
-                  }}
-                >
-                  <span style={{ fontSize: 20 }}>{q.icon}</span> {q.title}
+      {received.map((q) => (
+        <div
+          key={q.id}
+          style={{
+            background: "var(--panel)",
+            padding: 12,
+            borderRadius: 8,
+            marginBottom: 8,
+          }}
+        >
+          <span style={{ fontSize: 20 }}>{q.icon}</span> {q.title}
 
-                  <button
-                    style={{ marginLeft: 12 }}
-                    onClick={async () => {
-                      if (!token) return;
+          <button
+            style={{ marginLeft: 12 }}
+            onClick={async () => {
+              if (!token) return;
                       await completeQuest(token, q.id);
-                      setReceived((r) => r.filter((x) => x.id !== q.id));
-                    }}
-                  >
-                    Mark Completed
-                  </button>
-                </div>
-              ))}
+              setReceived((r) => r.filter((x) => x.id !== q.id));
+            }}
+          >
+            Mark Completed
+          </button>
+        </div>
+      ))}
 
-              {/* add friend */}
-              <h3 style={{ marginTop: 24 }}>Add Friend</h3>
+      {/* add friend */}
+      <h3 style={{ marginTop: 24 }}>Add Friend</h3>
               <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                <input
-                  placeholder="username"
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
+      <input
+        placeholder="username"
+        value={username}
+        onChange={(e) => setUsername(e.target.value)}
                   style={{ flex: 1 }}
-                />
-                <button
-                  onClick={() => {
-                    if (!token || !username) return;
-                    sendFriendRequest(token, username);
-                    setUsername("");
-                  }}
-                >
+      />
+      <button
+        onClick={() => {
+          if (!token || !username) return;
+          sendFriendRequest(token, username);
+          setUsername("");
+        }}
+      >
                   Send
-                </button>
+      </button>
               </div>
 
-              {/* incoming friend reqs */}
-              <h3 style={{ marginTop: 24 }}>Incoming Friend Requests</h3>
-              {requests.length === 0 && <p>No requests</p>}
+      {/* incoming friend reqs */}
+      <h3 style={{ marginTop: 24 }}>Incoming Friend Requests</h3>
+      {requests.length === 0 && <p>No requests</p>}
 
-              {requests.map((r) => (
-                <div
-                  key={r.id}
-                  style={{
-                    background: "var(--panel)",
-                    padding: 12,
-                    marginBottom: 8,
-                    borderRadius: 8,
-                  }}
-                >
-                  <span>Request from {r.from_user_id}</span>
-                  <div style={{ marginTop: 8 }}>
-                    <button
-                      onClick={async () => {
-                        if (!token) return;
-                        await respondFriendRequest(token, r.id, true);
-                        setRequests((rs) => rs.filter((x) => x.id !== r.id));
-                        getFriends(token).then(setFriends);
-                      }}
-                    >
-                      Accept
-                    </button>
-                    <button
-                      className="secondary"
-                      onClick={async () => {
-                        if (!token) return;
-                        await respondFriendRequest(token, r.id, false);
-                        setRequests((rs) => rs.filter((x) => x.id !== r.id));
-                      }}
-                    >
-                      Reject
-                    </button>
-                  </div>
-                </div>
-              ))}
+      {requests.map((r) => (
+        <div
+          key={r.id}
+          style={{
+            background: "var(--panel)",
+            padding: 12,
+            marginBottom: 8,
+            borderRadius: 8,
+          }}
+        >
+          <span>Request from {r.from_user_id}</span>
+          <div style={{ marginTop: 8 }}>
+            <button
+              onClick={async () => {
+                if (!token) return;
+                await respondFriendRequest(token, r.id, true);
+                setRequests((rs) => rs.filter((x) => x.id !== r.id));
+                getFriends(token).then(setFriends);
+              }}
+            >
+              Accept
+            </button>
+            <button
+              className="secondary"
+              onClick={async () => {
+                if (!token) return;
+                await respondFriendRequest(token, r.id, false);
+                setRequests((rs) => rs.filter((x) => x.id !== r.id));
+              }}
+            >
+              Reject
+            </button>
+          </div>
+        </div>
+      ))}
               
               {/* received quests */}
               <h3 style={{ marginTop: 88 }}>Received Quests</h3>
@@ -285,6 +353,67 @@ export default function Profile() {
             <div key={c.id}>{c.title}</div>
           ))}
         </div>
-      </div>
+
+      {/* PFP upload dialog */}
+      {showPfpDialog && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,0.7)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 1000,
+          }}
+          onClick={() => !isUploadingPfp && setShowPfpDialog(false)}
+        >
+          <div
+            style={{
+              background: "#050505",
+              borderRadius: 16,
+              padding: 20,
+              width: "min(420px, 90vw)",
+              boxShadow: "0 18px 60px rgba(0,0,0,0.8)",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 style={{ marginTop: 0, marginBottom: 8 }}>Update profile picture</h3>
+            <p
+              style={{
+                marginTop: 0,
+                marginBottom: 16,
+                fontSize: "0.9rem",
+                color: "rgba(200,200,200,0.9)",
+              }}
+            >
+              Choose a new image to use as your avatar.
+            </p>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "flex-end",
+                gap: 8,
+                marginTop: 8,
+              }}
+            >
+              <button
+                className="secondary"
+                onClick={() => !isUploadingPfp && setShowPfpDialog(false)}
+                disabled={isUploadingPfp}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isUploadingPfp}
+              >
+                {isUploadingPfp ? "Uploading..." : "Choose image"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
