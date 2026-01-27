@@ -266,7 +266,10 @@ export default function Profile() {
           </div>
         )}
         
-        <div style={{ maxWidth: 980, margin: "0 auto" }}>
+        <div
+          className="float-bob"
+          style={{ maxWidth: 920, animationDelay: "0.3s" }}
+        >
           <div
             style={{
               display: "grid",
