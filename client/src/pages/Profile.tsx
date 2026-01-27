@@ -558,41 +558,62 @@ export default function Profile() {
             {/* ROW 2 (right): received quests */}
             <div>
               <h3 style={{ marginTop: 0 }}>Received Quests</h3>
-              {received.length === 0 && <p>No active quests</p>}
-
-              <div
-                className="themed-scrollbar"
-                style={{
-                  height: 150,
-                  overflowY: "auto",
-                  paddingRight: 6,
-                }}
-              >
-                {received.map((q) => (
-                  <div
-                    key={q.id}
-                    style={{
-                      background: "var(--panel)",
-                      padding: 12,
-                      borderRadius: 8,
-                      marginBottom: 8,
-                    }}
-                  >
-                    <span style={{ fontSize: 20 }}>{q.icon}</span> {q.title}
-
-                    <button
-                      style={{ marginLeft: 12 }}
-                      onClick={async () => {
-                        if (!token) return;
-                        await completeQuest(token, q.id);
-                        setReceived((r) => r.filter((x) => x.id !== q.id));
+              {received.length === 0 ? (
+                <p>No active quests</p>
+              ) : (
+                <div
+                  className="themed-scrollbar"
+                  style={{
+                    height: 150,
+                    overflowY: "auto",
+                    paddingRight: 6,
+                  }}
+                >
+                  {received.map((q) => (
+                    <div
+                      key={q.id}
+                      style={{
+                        background: "var(--panel)",
+                        padding: 12,
+                        borderRadius: 8,
+                        marginBottom: 8,
                       }}
                     >
-                      Mark Completed
-                    </button>
-                  </div>
-                ))}
-              </div>
+                      <span style={{ fontSize: 20 }}>{q.icon}</span> {q.title}
+
+                      <button
+                        style={{ marginLeft: 12 }}
+                        onClick={async () => {
+                          if (!token) return;
+                          const completedQuest = await completeQuest(token, q.id);
+                          // remove from received list
+                          setReceived((r) => r.filter((x) => x.id !== q.id));
+                          // add badge immediately if not already present
+                          setCompleted((prev) => {
+                            if (prev.some((c) => c.id === completedQuest.quest_id)) {
+                              return prev;
+                            }
+                            return [
+                              {
+                                id: completedQuest.quest_id,
+                                title: completedQuest.title,
+                                icon: completedQuest.icon,
+                              },
+                              ...prev,
+                            ];
+                          });
+                          // Navigate to home and open the post modal with this quest pre-selected
+                          navigate("/home", {
+                            state: { completedQuestId: completedQuest.quest_id },
+                          });
+                        }}
+                      >
+                        Mark Completed
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
             {/* FULL WIDTH: completed quests */}
