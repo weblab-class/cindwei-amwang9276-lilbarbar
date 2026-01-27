@@ -56,6 +56,7 @@ export default function Login() {
 
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isScrolling, setIsScrolling] = useState(false);
   const [showHomeTransition, setShowHomeTransition] = useState(false);
   const [imageHeight, setImageHeight] = useState("400vh");
@@ -279,11 +280,29 @@ export default function Login() {
   //login authentication 
 
   const handleLogin = async () => {
-    await login(username, password);
-    await handleScrollTransition();
+    const u = username.trim();
+    const p = password.trim();
+    if (!u || !p) {
+      setErrorMessage("Please enter a username/password.");
+      return;
+    }
+    setErrorMessage(null);
+    try {
+      await login(username, password);
+      await handleScrollTransition();
+    } catch {
+      setErrorMessage("The username/password is incorrect");
+    }
   };
 
   const handleSignup = async () => {
+    const u = username.trim();
+    const p = password.trim();
+    if (!u || !p) {
+      setErrorMessage("Please enter a username/password.");
+      return;
+    }
+    setErrorMessage(null);
     await signup(username, password);
     await handleScrollTransition();
   };
@@ -353,14 +372,32 @@ export default function Login() {
             <input
               placeholder="username"
               value={username}
-              onChange={(e) => setUsername(e.target.value)}
+              onChange={(e) => {
+                setUsername(e.target.value);
+                if (errorMessage) setErrorMessage(null);
+              }}
             />
             <input
               placeholder="password"
               type="password"
               value={password}
-              onChange={(e) => setPassword(e.target.value)}
+              onChange={(e) => {
+                setPassword(e.target.value);
+                if (errorMessage) setErrorMessage(null);
+              }}
             />
+            {errorMessage && (
+              <div
+                style={{
+                  color: "rgba(255, 120, 120, 0.95)",
+                  fontSize: "0.8rem",
+                  marginTop: "0.25rem",
+                  maxWidth: 280,
+                }}
+              >
+                {errorMessage}
+              </div>
+            )}
             <div className="login-buttons">
               <button onClick={handleLogin}>Login</button>
               <button className="secondary" onClick={handleSignup}>Signup</button>

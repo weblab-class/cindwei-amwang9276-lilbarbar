@@ -28,7 +28,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       body: JSON.stringify({ username, password }),
     });
 
+    if (!res.ok) {
+      // let the caller show the appropriate message
+      throw new Error("LOGIN_FAILED");
+    }
     const data = await res.json();
+    if (!data?.token) {
+      throw new Error("LOGIN_FAILED");
+    }
     setToken(data.token);
     setUser(data.user);
   }
@@ -40,7 +47,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       body: JSON.stringify({ username, password }),
     });
 
+    if (!res.ok) {
+      throw new Error("SIGNUP_FAILED");
+    }
     const data = await res.json();
+    if (!data?.token) {
+      throw new Error("SIGNUP_FAILED");
+    }
     setToken(data.token);
     setUser(data.user);
   }
