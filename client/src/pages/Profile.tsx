@@ -715,6 +715,402 @@ export default function Profile() {
                 </div>
               )}
             </div>
+
+            {selectedPost && (
+              <div
+                style={{
+                  position: "fixed",
+                  inset: 0,
+                  background: "rgba(0,0,0,0.75)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  zIndex: 1000,
+                }}
+                onClick={() => setSelectedPost(null)}
+              >
+                <div
+                  style={{
+                    background: "#050505",
+                    borderRadius: 16,
+                    maxWidth: "90vw",
+                    maxHeight: "90vh",
+                    overflow: "hidden",
+                    boxShadow: "0 24px 80px rgba(0,0,0,0.85)",
+                    display: "flex",
+                  }}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {/* Left: media + quest + votes + meta */}
+                  <div
+                    style={{
+                      flex: 3,
+                      display: "flex",
+                      flexDirection: "column",
+                      background: "#000",
+                    }}
+                  >
+                    <div
+                      style={{
+                        position: "relative",
+                        flex: 1,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        padding: 12,
+                      }}
+                    >
+                      {/* Close button */}
+                      <button
+                        onClick={() => setSelectedPost(null)}
+                        style={{
+                          position: "absolute",
+                          top: 12,
+                          right: 16,
+                          background: "rgba(0,0,0,0.7)",
+                          border: "1px solid var(--muted)",
+                          borderRadius: 999,
+                          color: "var(--text)",
+                          padding: "4px 10px",
+                          cursor: "pointer",
+                          fontSize: "0.85rem",
+                          zIndex: 3,
+                        }}
+                      >
+                        ✕
+                      </button>
+
+                      {/* Media */}
+                      {selectedPost.media_type === "video" ? (
+                        <video
+                          src={selectedPost.media_url}
+                          style={{
+                            maxWidth: "100%",
+                            maxHeight: "80vh",
+                            objectFit: "contain",
+                          }}
+                          muted
+                          loop
+                          autoPlay
+                          playsInline
+                          controls
+                        />
+                      ) : (
+                        <img
+                          src={selectedPost.media_url}
+                          alt={selectedPost.quest_title || "Post"}
+                          style={{
+                            maxWidth: "100%",
+                            maxHeight: "80vh",
+                            objectFit: "contain",
+                          }}
+                        />
+                      )}
+                    </div>
+
+                    <div
+                      style={{
+                        padding: 16,
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: 12,
+                        background: "var(--panel)",
+                      }}
+                    >
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "space-between",
+                          gap: 16,
+                        }}
+                      >
+                        <div
+                          style={{ display: "flex", alignItems: "center", gap: 10 }}
+                        >
+                          <span style={{ fontSize: "1.6rem" }}>
+                            {selectedPost.quest_icon}
+                          </span>
+                          <div>
+                            <div
+                              style={{
+                                fontSize: "0.95rem",
+                                fontWeight: 600,
+                              }}
+                            >
+                              {selectedPost.quest_title}
+                            </div>
+                            <div
+                              style={{
+                                fontSize: "0.8rem",
+                                color: "var(--muted)",
+                              }}
+                            >
+                              Linked quest
+                            </div>
+                          </div>
+                        </div>
+
+                        <div
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 8,
+                          }}
+                        >
+                          <button
+                            onClick={() => handleVote(selectedPost.id, 1)}
+                            style={{
+                              background: "transparent",
+                              border: "1px solid var(--mint)",
+                              color: "var(--mint)",
+                              padding: "4px 10px",
+                              borderRadius: 999,
+                              cursor: "pointer",
+                              fontSize: "0.9rem",
+                            }}
+                          >
+                            ↑
+                          </button>
+                          <span
+                            style={{
+                              minWidth: "32px",
+                              textAlign: "center",
+                              fontWeight: 700,
+                            }}
+                          >
+                            {selectedPost.votes}
+                          </span>
+                          <button
+                            onClick={() => handleVote(selectedPost.id, -1)}
+                            style={{
+                              background: "transparent",
+                              border: "1px solid var(--mint)",
+                              color: "var(--mint)",
+                              padding: "4px 10px",
+                              borderRadius: 999,
+                              cursor: "pointer",
+                              fontSize: "0.9rem",
+                            }}
+                          >
+                            ↓
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Meta row with date and optional delete */}
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "space-between",
+                          fontSize: "0.8rem",
+                          color: "var(--muted)",
+                          marginTop: 4,
+                        }}
+                      >
+                        <span>
+                          {(() => {
+                            const date =
+                              selectedPost.created_at
+                                ? new Date(selectedPost.created_at)
+                                : fallbackCreatedAt;
+                            return date.toLocaleString(undefined, {
+                              month: "short",
+                              day: "numeric",
+                              year: "numeric",
+                              hour: "numeric",
+                              minute: "2-digit",
+                            });
+                          })()}
+                        </span>
+                        {isOwnProfile && (
+                          <button
+                            onClick={async () => {
+                              if (!token || !selectedPost) return;
+                              try {
+                                const { deletePost } = await import("../services/api");
+                                await deletePost(token, selectedPost.id);
+                                setMyPosts((prev) =>
+                                  prev.filter((p) => p.id !== selectedPost.id),
+                                );
+                                setSelectedPost(null);
+                              } catch (e) {
+                                console.error("Failed to delete post", e);
+                              }
+                            }}
+                            style={{
+                              background: "transparent",
+                              border: "1px solid rgba(255,0,0,0.5)",
+                              color: "rgba(255,120,120,0.95)",
+                              padding: "4px 10px",
+                              borderRadius: 999,
+                              cursor: "pointer",
+                              fontSize: "0.8rem",
+                            }}
+                          >
+                            Delete Post
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Right: comments column */}
+                  <div
+                    style={{
+                      flex: 2,
+                      display: "flex",
+                      flexDirection: "column",
+                      background: "var(--panel)",
+                      borderLeft: "1px solid var(--muted)",
+                      padding: 16,
+                      maxWidth: "360px",
+                    }}
+                  >
+                    <div
+                      style={{
+                        fontSize: "0.9rem",
+                        fontWeight: 600,
+                        marginBottom: 8,
+                      }}
+                    >
+                      Comments
+                    </div>
+
+                    <div
+                      style={{
+                        flex: 1,
+                        overflowY: "auto",
+                        marginBottom: 8,
+                      }}
+                    >
+                      {comments.length === 0 ? (
+                        <div
+                          style={{
+                            fontSize: "0.85rem",
+                            color: "var(--muted)",
+                          }}
+                        >
+                          No comments yet. Be the first to comment.
+                        </div>
+                      ) : (
+                        comments.map((c) => {
+                          const displayName = c.username ?? "anon";
+                          const initial = displayName[0]?.toUpperCase() ?? "?";
+                          return (
+                            <div
+                              key={c.id}
+                              style={{
+                                marginBottom: 8,
+                                fontSize: "0.85rem",
+                                display: "flex",
+                                alignItems: "flex-start",
+                                gap: 8,
+                              }}
+                            >
+                              <div
+                                style={{
+                                  width: 24,
+                                  height: 24,
+                                  borderRadius: "50%",
+                                  background: c.pfp_url
+                                    ? "transparent"
+                                    : "rgba(255,255,255,0.12)",
+                                  border: "1px solid rgba(255,255,255,0.28)",
+                                  display: "flex",
+                                  alignItems: "center",
+                                  justifyContent: "center",
+                                  fontSize: "0.65rem",
+                                  fontWeight: 700,
+                                  color: "rgba(255,255,255,0.9)",
+                                  overflow: "hidden",
+                                  flexShrink: 0,
+                                }}
+                              >
+                                {c.pfp_url ? (
+                                  <img
+                                    src={c.pfp_url}
+                                    alt={`${displayName} avatar`}
+                                    style={{
+                                      width: "100%",
+                                      height: "100%",
+                                      objectFit: "cover",
+                                      display: "block",
+                                    }}
+                                  />
+                                ) : (
+                                  initial
+                                )}
+                              </div>
+                              <div>
+                                <span
+                                  style={{
+                                    fontWeight: 600,
+                                    marginRight: 4,
+                                  }}
+                                >
+                                  {displayName}:
+                                </span>
+                                <span>{c.content}</span>
+                              </div>
+                            </div>
+                          );
+                        })
+                      )}
+                    </div>
+
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 8,
+                        marginTop: 4,
+                      }}
+                    >
+                      <input
+                        placeholder="Add a comment..."
+                        value={newComment}
+                        onChange={(e) => setNewComment(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            void handleCreateComment();
+                          }
+                        }}
+                        style={{
+                          flex: 1,
+                          padding: "6px 10px",
+                          borderRadius: 8,
+                          border: "1px solid var(--muted)",
+                          background: "transparent",
+                          color: "var(--text)",
+                          fontSize: "0.85rem",
+                        }}
+                      />
+                      <button
+                        onClick={handleCreateComment}
+                        disabled={!newComment.trim()}
+                        style={{
+                          background: newComment.trim()
+                            ? "var(--mint)"
+                            : "rgba(255,255,255,0.12)",
+                          border: "none",
+                          color: newComment.trim() ? "#000" : "var(--muted)",
+                          padding: "6px 12px",
+                          borderRadius: 999,
+                          cursor: newComment.trim() ? "pointer" : "default",
+                          fontSize: "0.85rem",
+                          fontWeight: 600,
+                        }}
+                      >
+                        Post
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>
