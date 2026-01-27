@@ -10,9 +10,6 @@ import {
   fetchCompletedQuests
 } from "../services/api";
 
-import { useDebounce } from "../hooks/useDebounce";
-import type { Badge } from "../types/badge";
-
 interface CompletedQuest {
   id: string;
   title: string;
@@ -37,11 +34,6 @@ interface ReceivedQuest {
   icon: string;
 }
 
-interface Line {
-  from: string;
-  to: string;
-}
-
 //components
 
 export default function Profile() {
@@ -53,11 +45,6 @@ export default function Profile() {
   const [friends, setFriends] = useState<Friend[]>([]);
   const [received, setReceived] = useState<ReceivedQuest[]>([]);
 
-  // badge state
-  const [badges, setBadges] = useState<Badge[]>([]);
-  const [lines, setLines] = useState<Line[]>([]);
-  const [loaded, setLoaded] = useState(false);
-
   const [completed, setCompleted] = useState<CompletedQuest[]>([]);
 
 
@@ -67,7 +54,7 @@ export default function Profile() {
     getIncomingRequests(token).then(setRequests);
   }, [token]);
 
-    useEffect(() => {
+  useEffect(() => {
     if (!token) return;
     fetchCompletedQuests(token).then(setCompleted);
   }, [token]);
@@ -94,109 +81,177 @@ export default function Profile() {
 
   return (
     <div style={{ padding: 24 }}>
-      <h2>@{user.username}</h2>
-
-      {/* completed quests */}
-      <h3>Your Completed Quests</h3>
-      
-
-      {/* friends */}
-      <h3 style={{ marginTop: 24 }}>Friends</h3>
-      {friends.length === 0 && <p>No friends yet</p>}
-      {friends.map((f) => (
-        <div key={f.id}>@{f.username}</div>
-      ))}
-
-      {/* recieved quests */}
-      <h3 style={{ marginTop: 24 }}>Received Quests</h3>
-      {received.length === 0 && <p>No active quests</p>}
-
-      {received.map((q) => (
-        <div
-          key={q.id}
-          style={{
-            background: "var(--panel)",
-            padding: 12,
-            borderRadius: 8,
-            marginBottom: 8,
-          }}
-        >
-          <span style={{ fontSize: 20 }}>{q.icon}</span> {q.title}
-
-          <button
-            style={{ marginLeft: 12 }}
-            onClick={async () => {
-              if (!token) return;
-
-              const completed = await completeQuest(token, q.id);
-
-              // remove quest from received list
-              setReceived((r) => r.filter((x) => x.id !== q.id));
-
-              // add badge to completed badges TODO NOT IMPLEMENTED
-        
-            }}
-          >
-            Mark Completed
-          </button>
-        </div>
-      ))}
-
-      {/* add friend */}
-      <h3 style={{ marginTop: 24 }}>Add Friend</h3>
-      <input
-        placeholder="username"
-        value={username}
-        onChange={(e) => setUsername(e.target.value)}
-      />
-      <button
-        onClick={() => {
-          if (!token || !username) return;
-          sendFriendRequest(token, username);
-          setUsername("");
-        }}
-      >
-        Send Request
-      </button>
-
-      {/* incoming friend reqs */}
-      <h3 style={{ marginTop: 24 }}>Incoming Friend Requests</h3>
-      {requests.length === 0 && <p>No requests</p>}
-
-      {requests.map((r) => (
-        <div
-          key={r.id}
-          style={{
-            background: "var(--panel)",
-            padding: 12,
-            marginBottom: 8,
-            borderRadius: 8,
-          }}
-        >
-          <span>Request from {r.from_user_id}</span>
-          <div style={{ marginTop: 8 }}>
-            <button
-              onClick={async () => {
-                if (!token) return;
-                await respondFriendRequest(token, r.id, true);
-                setRequests((rs) => rs.filter((x) => x.id !== r.id));
-                getFriends(token).then(setFriends);
+      {/* Constrain just the 2-column top section so the right column doesn't drift on wide screens */}
+      <div style={{ maxWidth: 920 }}>
+        <div style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
+          {/* LEFT: username + received quests + badges */}
+          <div style={{ flex: "0 1 560px", minWidth: 320 }}>
+          {/* profile header (left-aligned as a block, but handle centered under avatar) */}
+          <div style={{ display: "flex", justifyContent: "flex-start" }}>
+            <div
+              style={{
+                width: 280,
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                gap: 18,
+                textAlign: "center",
               }}
             >
-              Accept
-            </button>
-            <button
-              className="secondary"
-              onClick={async () => {
-                if (!token) return;
-                await respondFriendRequest(token, r.id, false);
-                setRequests((rs) => rs.filter((x) => x.id !== r.id));
+              {/* temporary profile picture placeholder */}
+              <div
+                aria-label="Profile picture"
+                style={{
+                  width: 240,
+                  height: 240,
+                  borderRadius: "50%",
+                  background: "rgba(255,255,255,0.08)",
+                  border: "2px solid rgba(255,255,255,0.18)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontWeight: 800,
+                  fontSize: 34,
+                  color: "rgba(255,255,255,0.9)",
+                  userSelect: "none",
+                }}
+              >
+                {(user.username?.[0] ?? "?").toUpperCase()}
+              </div>
+
+              <h2 style={{ marginTop: 0, marginBottom: 0, textAlign: "center" }}>
+                @{user.username}
+              </h2>
+            </div>
+          </div>
+
+          {/* quest badges */}
+          <h3 style={{ marginTop: 40 }}>Quest Badges</h3>
+          <p style={{ color: "rgba(180, 180, 180, 0.9)" }}>You have no badges</p>
+          </div>
+
+
+          {/* RIGHT: friends + add friend + incoming friend requests */}
+          <div style={{ width: 340, minWidth: 320 }}>
+          {/* friends */}
+          <h3 style={{ marginTop: 0 }}>Friends</h3>
+          {friends.length === 0 && <p>No friends yet</p>}
+          {friends.map((f) => (
+            <div key={f.id}>@{f.username}</div>
+          ))}
+
+          {received.map((q) => (
+            <div
+              key={q.id}
+              style={{
+                background: "var(--panel)",
+                padding: 12,
+                borderRadius: 8,
+                marginBottom: 8,
               }}
             >
-              Reject
+              <span style={{ fontSize: 20 }}>{q.icon}</span> {q.title}
+
+              <button
+                style={{ marginLeft: 12 }}
+                onClick={async () => {
+                  if (!token) return;
+                  await completeQuest(token, q.id);
+                  setReceived((r) => r.filter((x) => x.id !== q.id));
+                }}
+              >
+                Mark Completed
+              </button>
+            </div>
+          ))}
+
+          {/* add friend */}
+          <h3 style={{ marginTop: 24 }}>Add Friend</h3>
+          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            <input
+              placeholder="username"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              style={{ flex: 1 }}
+            />
+            <button
+              onClick={() => {
+                if (!token || !username) return;
+                sendFriendRequest(token, username);
+                setUsername("");
+              }}
+            >
+              Send
             </button>
           </div>
+
+          {/* incoming friend reqs */}
+          <h3 style={{ marginTop: 24 }}>Incoming Friend Requests</h3>
+          {requests.length === 0 && <p>No requests</p>}
+
+          {requests.map((r) => (
+            <div
+              key={r.id}
+              style={{
+                background: "var(--panel)",
+                padding: 12,
+                marginBottom: 8,
+                borderRadius: 8,
+              }}
+            >
+              <span>Request from {r.from_user_id}</span>
+              <div style={{ marginTop: 8 }}>
+                <button
+                  onClick={async () => {
+                    if (!token) return;
+                    await respondFriendRequest(token, r.id, true);
+                    setRequests((rs) => rs.filter((x) => x.id !== r.id));
+                    getFriends(token).then(setFriends);
+                  }}
+                >
+                  Accept
+                </button>
+                <button
+                  className="secondary"
+                  onClick={async () => {
+                    if (!token) return;
+                    await respondFriendRequest(token, r.id, false);
+                    setRequests((rs) => rs.filter((x) => x.id !== r.id));
+                  }}
+                >
+                  Reject
+                </button>
+              </div>
+            </div>
+          ))}
+          
+          {/* received quests */}
+          <h3 style={{ marginTop: 88 }}>Received Quests</h3>
+          {received.length === 0 && <p>No active quests</p>}
+          </div>
         </div>
+      </div>
+      
+      {/* completed quests */}
+      <h3 style={{ marginTop: 32 }}>Your Completed Quests</h3>
+      {completed.length === 0 && (
+        <div
+          style={{
+            width: "100%",
+            minHeight: "35vh",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            textAlign: "center",
+            color: "rgba(180, 180, 180, 0.9)",
+            padding: "24px 12px",
+          }}
+        >
+          No completed quests yet, add your first to your quest chest!
+        </div>
+      )}
+      {completed.map((c) => (
+        <div key={c.id}>{c.title}</div>
       ))}
     </div>
   );
