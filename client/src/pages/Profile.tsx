@@ -22,6 +22,7 @@ interface CompletedQuest {
 interface FriendRequest {
   id: string;
   from_user_id: string;
+  from_username?: string | null;
 }
 
 interface Friend {
@@ -40,6 +41,8 @@ interface ReceivedQuest {
 export default function Profile() {
   const { user, token } = useAuth();
 
+  const row1HeightPx = 350;
+
   const [username, setUsername] = useState("");
 
   const [requests, setRequests] = useState<FriendRequest[]>([]);
@@ -47,6 +50,9 @@ export default function Profile() {
   const [received, setReceived] = useState<ReceivedQuest[]>([]);
   
   const [completed, setCompleted] = useState<CompletedQuest[]>([]);
+
+  const visibleFriends = friends.slice(0, 8);
+  const hiddenFriendsCount = Math.max(0, friends.length - visibleFriends.length);
 
   // incoming friend requests
   useEffect(() => {
@@ -112,12 +118,18 @@ export default function Profile() {
       
       {/* content */}
       <div style={{ position: "relative", zIndex: 1 }}>
-        {/* Constrain just the 2-column top section so the right column doesn't drift on wide screens */}
-        <div style={{ maxWidth: 920 }}>
-          <div style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
-            {/* LEFT: username + received quests + badges */}
-            <div style={{ flex: "0 1 560px", minWidth: 320 }}>
-              {/* profile header (left-aligned as a block, but handle centered under avatar) */}
+        <div style={{ maxWidth: 980, margin: "0 auto" }}>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))",
+              columnGap: 24,
+              rowGap: 50,
+              alignItems: "start",
+            }}
+          >
+            {/* ROW 1 (left): profile */}
+            <div style={{ height: row1HeightPx, overflow: "hidden" }}>
               <div style={{ display: "flex", justifyContent: "flex-start" }}>
                 <div
                   style={{
@@ -155,21 +167,105 @@ export default function Profile() {
                   </h2>
                 </div>
               </div>
+            </div>
 
-              {/* quest badges */}
-              <h3 style={{ marginTop: 40 }}>Quest Badges</h3>
-              <p style={{ color: "rgba(180, 180, 180, 0.9)" }}>You have no badges</p>
+            <div style={{ height: row1HeightPx }}>
+              <div style={{ height: "100%", overflow: "hidden" }}>
+                <h3 style={{ marginTop: 0 }}>Friends</h3>
+                {friends.length === 0 && <p>No friends yet</p>}
+                {visibleFriends.map((f) => (
+                  <div key={f.id}>@{f.username}</div>
+                ))}
+                {hiddenFriendsCount > 0 && (
+                  <p style={{ color: "rgba(180, 180, 180, 0.9)", marginTop: 6 }}>
+                    +{hiddenFriendsCount} more
+                  </p>
+                )}
+
+                <h3 style={{ marginTop: 24 }}>Add Friend</h3>
+                <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                  <input
+                    placeholder="username"
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value)}
+                    style={{ flex: 1 }}
+                  />
+                  <button
+                    onClick={() => {
+                      if (!token || !username) return;
+                      sendFriendRequest(token, username);
+                      setUsername("");
+                    }}
+                  >
+                    Send
+                  </button>
+                </div>
+
+                <h3 style={{ marginTop: 24 }}>Incoming Friend Requests</h3>
+                {requests.length === 0 && <p>No requests</p>}
+
+                <div
+                  className="themed-scrollbar"
+                  style={{
+                    height: 116,
+                    overflowX: "auto",
+                    overflowY: "hidden",
+                    display: "flex",
+                    gap: 16,
+                    alignItems: "flex-start",
+                    WebkitOverflowScrolling: "touch",
+                  }}
+                >
+                  {requests.map((r) => (
+                    <div
+                      key={r.id}
+                      style={{
+                        background: "var(--panel)",
+                        padding: "10px 10px",
+                        borderRadius: 8,
+                        minWidth: 260,
+                        flex: "0 0 auto",
+                      }}
+                    >
+                      <span>Request from @{r.from_username ?? r.from_user_id}</span>
+                      <div style={{ marginTop: 14, display: "flex", gap: 16 }}>
+                        <button
+                          onClick={async () => {
+                            if (!token) return;
+                            await respondFriendRequest(token, r.id, true);
+                            setRequests((rs) => rs.filter((x) => x.id !== r.id));
+                            getFriends(token).then(setFriends);
+                          }}
+                        >
+                          Accept
+                        </button>
+                        <button
+                          className="secondary"
+                          onClick={async () => {
+                            if (!token) return;
+                            await respondFriendRequest(token, r.id, false);
+                            setRequests((rs) => rs.filter((x) => x.id !== r.id));
+                          }}
+                        >
+                          Reject
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
+            </div>
 
+            {/* ROW 2 (left): quest badges */}
+            <div>
+              <h3 style={{ marginTop: 0 }}>Quest Badges</h3>
+              <p style={{ color: "rgba(180, 180, 180, 0.9)" }}>You have no badges</p>
+            </div>
 
-              {/* RIGHT: friends + add friend + incoming friend requests */}
-              <div style={{ width: 340, minWidth: 320 }}>
-              {/* friends */}
-              <h3 style={{ marginTop: 0 }}>Friends</h3>
-              {friends.length === 0 && <p>No friends yet</p>}
-              {friends.map((f) => (
-                <div key={f.id}>@{f.username}</div>
-              ))}
+            {/* ROW 2 (right): received quests */}
+            <div>
+              <h3 style={{ marginTop: 0 }}>Received Quests</h3>
+              {received.length === 0 && <p>No active quests</p>}
 
               {received.map((q) => (
                 <div
@@ -195,96 +291,34 @@ export default function Profile() {
                   </button>
                 </div>
               ))}
+            </div>
 
-              {/* add friend */}
-              <h3 style={{ marginTop: 24 }}>Add Friend</h3>
-              <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                <input
-                  placeholder="username"
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                  style={{ flex: 1 }}
-                />
-                <button
-                  onClick={() => {
-                    if (!token || !username) return;
-                    sendFriendRequest(token, username);
-                    setUsername("");
-                  }}
-                >
-                  Send
-                </button>
-              </div>
-
-              {/* incoming friend reqs */}
-              <h3 style={{ marginTop: 24 }}>Incoming Friend Requests</h3>
-              {requests.length === 0 && <p>No requests</p>}
-
-              {requests.map((r) => (
+            {/* FULL WIDTH: completed quests */}
+            <div style={{ gridColumn: "1 / -1" }}>
+              <h3 style={{ marginTop: 8 }}>Your Completed Quests</h3>
+              {completed.length === 0 && (
                 <div
-                  key={r.id}
                   style={{
-                    background: "var(--panel)",
-                    padding: 12,
-                    marginBottom: 8,
-                    borderRadius: 8,
+                    width: "100%",
+                    minHeight: "35vh",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    textAlign: "center",
+                    color: "rgba(180, 180, 180, 0.9)",
+                    padding: "24px 12px",
                   }}
                 >
-                  <span>Request from {r.from_user_id}</span>
-                  <div style={{ marginTop: 8 }}>
-                    <button
-                      onClick={async () => {
-                        if (!token) return;
-                        await respondFriendRequest(token, r.id, true);
-                        setRequests((rs) => rs.filter((x) => x.id !== r.id));
-                        getFriends(token).then(setFriends);
-                      }}
-                    >
-                      Accept
-                    </button>
-                    <button
-                      className="secondary"
-                      onClick={async () => {
-                        if (!token) return;
-                        await respondFriendRequest(token, r.id, false);
-                        setRequests((rs) => rs.filter((x) => x.id !== r.id));
-                      }}
-                    >
-                      Reject
-                    </button>
-                  </div>
+                  No completed quests yet, add your first to your quest chest!
                 </div>
+              )}
+              {completed.map((c) => (
+                <div key={c.id}>{c.title}</div>
               ))}
-              
-              {/* received quests */}
-              <h3 style={{ marginTop: 88 }}>Received Quests</h3>
-              {received.length === 0 && <p>No active quests</p>}
-              </div>
             </div>
           </div>
-          
-          {/* completed quests */}
-          <h3 style={{ marginTop: 32 }}>Your Completed Quests</h3>
-          {completed.length === 0 && (
-            <div
-              style={{
-                width: "100%",
-                minHeight: "35vh",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                textAlign: "center",
-                color: "rgba(180, 180, 180, 0.9)",
-                padding: "24px 12px",
-              }}
-            >
-              No completed quests yet, add your first to your quest chest!
-            </div>
-          )}
-          {completed.map((c) => (
-            <div key={c.id}>{c.title}</div>
-          ))}
         </div>
       </div>
+    </div>
   );
 }
