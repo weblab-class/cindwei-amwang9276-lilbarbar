@@ -51,6 +51,8 @@ interface ReceivedQuest {
 
 //components
 
+type Vote = -1 | 0 | 1;
+
 export default function Profile() {
   const { user, token } = useAuth();
 
@@ -72,6 +74,7 @@ export default function Profile() {
   const [showPfpDialog, setShowPfpDialog] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [myPosts, setMyPosts] = useState<Post[]>([]);
+  const [myVotes, setMyVotes] = useState<Record<string, Vote>>({});
   const [hoveredPostId, setHoveredPostId] = useState<string | null>(null);
   const [selectedPost, setSelectedPost] = useState<Post | null>(null);
   const [comments, setComments] = useState<Comment[]>([]);
@@ -83,18 +86,38 @@ export default function Profile() {
 
   const fallbackCreatedAt = new Date("2026-01-27T09:00:00");
 
-  async function handleVote(postId: string, delta: number) {
+  async function handleVote(postId: string, direction: 1 | -1) {
     if (!token) return;
+    const prevVote: Vote = myVotes[postId] ?? 0;
+    const nextVote: Vote = prevVote === direction ? 0 : direction;
+    const delta = nextVote - prevVote; // -2, -1, +1, +2
+    if (delta === 0) return;
+
+    // optimistic UI update
+    setMyVotes((prev) => ({ ...prev, [postId]: nextVote }));
+    setMyPosts((prev) =>
+      prev.map((p) =>
+        p.id === postId ? { ...p, votes: p.votes + delta, my_vote: nextVote } : p
+      )
+    );
+    setSelectedPost((prev) =>
+      prev && prev.id === postId ? { ...prev, votes: prev.votes + delta, my_vote: nextVote } : prev
+    );
+
     try {
       await votePost(token, postId, delta);
-      setMyPosts((prev) =>
-        prev.map((p) => (p.id === postId ? { ...p, votes: p.votes + delta } : p)),
-      );
-      setSelectedPost((prev) =>
-        prev && prev.id === postId ? { ...prev, votes: prev.votes + delta } : prev,
-      );
     } catch (e) {
       console.error("Failed to vote on post", e);
+      // rollback on failure
+      setMyVotes((prev) => ({ ...prev, [postId]: prevVote }));
+      setMyPosts((prev) =>
+        prev.map((p) =>
+          p.id === postId ? { ...p, votes: p.votes - delta, my_vote: prevVote } : p
+        )
+      );
+      setSelectedPost((prev) =>
+        prev && prev.id === postId ? { ...prev, votes: prev.votes - delta, my_vote: prevVote } : prev
+      );
     }
   }
 
@@ -173,7 +196,16 @@ export default function Profile() {
       .then((all: Post[]) =>
         all.filter((p) => p.poster_username === profileUsername)
       )
-      .then(setMyPosts)
+      .then((posts: Post[]) => {
+        setMyPosts(posts);
+        setMyVotes(() => {
+          const next: Record<string, Vote> = {};
+          for (const p of posts) {
+            next[p.id] = (p.my_vote ?? 0) as Vote;
+          }
+          return next;
+        });
+      })
       .catch(() => {
         // ignore for now
       });
@@ -922,9 +954,15 @@ export default function Profile() {
                           <button
                             onClick={() => handleVote(selectedPost.id, 1)}
                             style={{
-                              background: "transparent",
+                              background:
+                                (myVotes[selectedPost.id] ?? 0) === 1
+                                  ? "var(--mint)"
+                                  : "transparent",
                               border: "1px solid var(--mint)",
-                              color: "var(--mint)",
+                              color:
+                                (myVotes[selectedPost.id] ?? 0) === 1
+                                  ? "#000"
+                                  : "var(--mint)",
                               padding: "4px 10px",
                               borderRadius: 999,
                               cursor: "pointer",
@@ -945,9 +983,15 @@ export default function Profile() {
                           <button
                             onClick={() => handleVote(selectedPost.id, -1)}
                             style={{
-                              background: "transparent",
+                              background:
+                                (myVotes[selectedPost.id] ?? 0) === -1
+                                  ? "var(--mint)"
+                                  : "transparent",
                               border: "1px solid var(--mint)",
-                              color: "var(--mint)",
+                              color:
+                                (myVotes[selectedPost.id] ?? 0) === -1
+                                  ? "#000"
+                                  : "var(--mint)",
                               padding: "4px 10px",
                               borderRadius: 999,
                               cursor: "pointer",
@@ -1237,12 +1281,12 @@ export default function Profile() {
         </div>
       </div>
 
-      {/* {showPostModal && (
+      {showPostModal && (
         <PostModal
           onClose={() => setShowPostModal(false)}
           onSubmit={handleUpload}
         />
-      )} */}
+      )}
     </div>
   );
 }
