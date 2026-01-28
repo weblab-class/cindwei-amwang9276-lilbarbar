@@ -65,6 +65,7 @@ class ReceivedQuest(Base):
     user_id = Column(String, ForeignKey("users.id"))
     quest_id = Column(String, ForeignKey("quests.id"))
     status = Column(String, default="received")  # received | completed
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
 
 
 class CompletedQuest(Base):

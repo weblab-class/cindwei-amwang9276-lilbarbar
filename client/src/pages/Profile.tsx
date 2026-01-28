@@ -20,12 +20,15 @@ import {
   votePost,
   uploadProfilePicture,
   removeFriend,
+  getQuestDifficulty,
+  getQuestReceivedAt,
 } from "../services/api";
 import type { Post } from "../types/post";
 import { fetchPosts } from "../services/api";
 import type { Comment } from "../types/comment";
 import LiquidEther from "../components/LiquidEther";
 import PostModal from "../components/PostModal";
+import CompletionCard from "../components/CompletionCard";
 
 interface CompletedQuest {
   id: string; // quest id (server returns quest_id as id)
@@ -81,6 +84,13 @@ export default function Profile() {
   const [myVotes, setMyVotes] = useState<Record<string, Vote>>({});
   const [hoveredPostId, setHoveredPostId] = useState<string | null>(null);
   const [selectedPost, setSelectedPost] = useState<Post | null>(null);
+  const [showCompletionCard, setShowCompletionCard] = useState(false);
+  const [completionData, setCompletionData] = useState<{
+    questTitle: string;
+    timeToComplete: { days: number; hours: number; minutes: number };
+    difficulty: number;
+    difficultyLabel: string;
+  } | null>(null);
   const [comments, setComments] = useState<Comment[]>([]);
   const [newComment, setNewComment] = useState("");
 
@@ -111,21 +121,6 @@ export default function Profile() {
 
     return map;
   }, [myPosts]);
-
-  async function handleVote(postId: string, delta: number) {
-  // When switching between profiles, clear profile-specific UI state
-  // so we don't flash stale data from the previous user.
-  useEffect(() => {
-    setHoveredBadgeId(null);
-    setCompleted([]);
-    setMyPosts([]);
-    setMyVotes({});
-    setHoveredPostId(null);
-    setSelectedPost(null);
-    setComments([]);
-    setNewComment("");
-    setPfpUrl(null);
-  }, [profileUsername]);
 
   async function handleVote(postId: string, direction: 1 | -1) {
     if (!token) return;
@@ -169,6 +164,64 @@ export default function Profile() {
       setComments(data);
     } catch (e) {
       console.error("Failed to load comments", e);
+    }
+  }
+
+  async function showCompletionCardForPost(post: Post) {
+    if (!token || !post.quest_id || !post.quest_title) return;
+    
+    try {
+      // Get when the quest was received
+      const receivedData = await getQuestReceivedAt(token, post.quest_id);
+      const receivedAt = receivedData.received_at;
+      
+      // Use post created_at as completion time, or current time as fallback
+      const completedTime = post.created_at 
+        ? new Date(post.created_at).getTime() 
+        : Date.now();
+      const receivedTime = new Date(receivedAt).getTime();
+      const diffMs = completedTime - receivedTime;
+      
+      const days = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+      const hours = Math.floor((diffMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+      const minutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+
+      // Get difficulty
+      const difficultyData = await getQuestDifficulty(post.quest_id);
+      const completionRate = difficultyData.completion_rate;
+
+      // Determine difficulty level
+      let difficulty = 0;
+      let difficultyLabel = "surface";
+      if (completionRate >= 80) {
+        difficulty = 1;
+        difficultyLabel = "surface";
+      } else if (completionRate >= 60) {
+        difficulty = 2;
+        difficultyLabel = "twilight";
+      } else if (completionRate >= 40) {
+        difficulty = 3;
+        difficultyLabel = "midnight";
+      } else if (completionRate >= 20) {
+        difficulty = 4;
+        difficultyLabel = "abyssal";
+      } else if (completionRate >= 5) {
+        difficulty = 5;
+        difficultyLabel = "hadal";
+      } else {
+        difficulty = 5;
+        difficultyLabel = "hadal";
+      }
+
+      setCompletionData({
+        questTitle: post.quest_title,
+        timeToComplete: { days, hours, minutes },
+        difficulty,
+        difficultyLabel,
+      });
+      setShowCompletionCard(true);
+    } catch (error) {
+      console.error("Failed to show completion card:", error);
     }
   }
 
@@ -291,6 +344,18 @@ export default function Profile() {
       });
   }, [token, profileUsername]);
 
+  // Reset profile-specific UI when switching profiles
+  useEffect(() => {
+    setHoveredBadgeId(null);
+    setCompleted([]);
+    setMyPosts([]);
+    setMyVotes({});
+    setHoveredPostId(null);
+    setSelectedPost(null);
+    setComments([]);
+    setNewComment("");
+    setPfpUrl(null);
+  }, [profileUsername]);
 
   //load badges here NOT IMPLEMENTED TODO
 
@@ -337,6 +402,19 @@ export default function Profile() {
             resolution={0.5}
           />
         </div>
+      </div>
+
+      {/* Kraken decoration in bottom right - behind UI but in front of react bit background */}
+      <div
+        style={{
+          position: "fixed",
+          bottom: 24,
+          right: 24,
+          zIndex: 0,
+          pointerEvents: "none",
+        }}
+      >
+        <img src="/kraken.svg" alt="" width={300} height={300} style={{ opacity: 0.4 }} />
       </div>
       
       {/* content */}
@@ -598,7 +676,7 @@ export default function Profile() {
                                 <div
                                   style={{
                                     position: "absolute",
-                                    top: "120%",
+                                    bottom: "120%",
                                     left: "50%",
                                     transform: "translateX(-50%)",
                                     whiteSpace: "nowrap",
@@ -609,7 +687,8 @@ export default function Profile() {
                                     fontSize: "0.75rem",
                                     boxShadow: "0 4px 12px rgba(0,0,0,0.6)",
                                     pointerEvents: "none",
-                                    zIndex: 10,
+                                    zIndex: 1000,
+                                    marginBottom: 4,
                                   }}
                                 >
                                   {c.title}
@@ -785,79 +864,6 @@ export default function Profile() {
               </div>
             </div>
 
-            {/* ROW 2 (left): quest badges */}
-            <div>            
-              <h3 style={{ marginTop: 0 }}>Quest Badges</h3>
-                {completed.length === 0 ? (
-                  <p
-                    style={{
-                      margin: 0,
-                      fontSize: "0.85rem",
-                      color: "rgba(160,160,160,0.9)",
-                    }}
-                  >
-                    {isOwnProfile
-                      ? "You have no badges yet. Complete shared quests to earn them."
-                      : `@${profileUsername} has no badges yet.`}
-                  </p>
-                ) : (
-                  <div
-                    style={{
-                      display: "flex",
-                      flexWrap: "wrap",
-                      gap: 8,
-                      justifyContent: "center",
-                      marginTop: 4,
-                    }}
-                  >
-                    {completed.map((c) => (
-                      <div
-                        key={c.id}
-                        style={{
-                          position: "relative",
-                          display: "inline-flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                        }}
-                        onMouseEnter={() => setHoveredBadgeId(c.id)}
-                        onMouseLeave={() => setHoveredBadgeId(null)}
-                      >
-                        <span
-                          style={{
-                            fontSize: "1.8rem",
-                            filter: "drop-shadow(0 0 6px rgba(0,0,0,0.6))",
-                            cursor: "default",
-                          }}
-                        >
-                          {c.icon}
-                        </span>
-                        {hoveredBadgeId === c.id && (
-                          <div
-                            style={{
-                              position: "absolute",
-                              top: "120%",
-                              left: "50%",
-                              transform: "translateX(-50%)",
-                              whiteSpace: "nowrap",
-                              background: "rgba(0, 0, 0, 0.85)",
-                              color: "rgba(255, 255, 255, 0.95)",
-                              padding: "4px 8px",
-                              borderRadius: 6,
-                              fontSize: "0.75rem",
-                              boxShadow: "0 4px 12px rgba(0,0,0,0.6)",
-                              pointerEvents: "none",
-                              zIndex: 10,
-                            }}
-                          >
-                            {c.title}
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                )}
-            </div>
-
             {/* ROW 2 (right): received quests */}
             <div>
               <h3 style={{ marginTop: 0 }}>Received Quests</h3>
@@ -867,7 +873,7 @@ export default function Profile() {
                 <div
                   className="themed-scrollbar"
                   style={{
-                    height: 150,
+                    height: 250,
                     overflowY: "auto",
                     paddingRight: 6,
                   }}
@@ -880,12 +886,18 @@ export default function Profile() {
                         padding: 12,
                         borderRadius: 8,
                         marginBottom: 8,
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: 8,
                       }}
                     >
-                      <span style={{ fontSize: 20 }}>{q.icon}</span> {q.title}
+                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        <span style={{ fontSize: 20 }}>{q.icon}</span>
+                        <span style={{ flex: 1, wordBreak: "break-word" }}>{q.title}</span>
+                      </div>
 
                       <button
-                        style={{ marginLeft: 12 }}
+                        style={{ alignSelf: "flex-start" }}
                         onClick={async () => {
                           if (!isOwnProfile) return;
                           if (!token) return;
@@ -908,7 +920,11 @@ export default function Profile() {
                           });
                           // Navigate to home and open the post modal with this quest pre-selected
                           navigate("/home", {
-                            state: { completedQuestId: completedQuest.quest_id },
+                            state: {
+                              completedQuestId: completedQuest.quest_id,
+                              completedQuestTitle: completedQuest.title,
+                              receivedAt: completedQuest.received_at,
+                            },
                           });
                         }}
                         disabled={!isOwnProfile}
@@ -1007,6 +1023,27 @@ export default function Profile() {
                           }}
                         />
                       )}
+                      {/* Vote count in top right */}
+                      <div
+                        style={{
+                          position: "absolute",
+                          top: 8,
+                          right: 8,
+                          background: "rgba(0, 0, 0, 0.75)",
+                          color: "rgba(255, 255, 255, 0.95)",
+                          padding: "4px 8px",
+                          borderRadius: 999,
+                          fontSize: "0.75rem",
+                          fontWeight: 600,
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 4,
+                          zIndex: 2,
+                        }}
+                      >
+                        <span>↑</span>
+                        <span>{p.votes}</span>
+                      </div>
                       {hoveredPostId === p.id && p.quest_title && (
                         <div
                           style={{
@@ -1076,6 +1113,7 @@ export default function Profile() {
                       display: "flex",
                       flexDirection: "column",
                       background: "#000",
+                      minHeight: 0,
                     }}
                   >
                     <div
@@ -1086,6 +1124,9 @@ export default function Profile() {
                         alignItems: "center",
                         justifyContent: "center",
                         padding: 12,
+                        minHeight: 0,
+                        maxHeight: "60vh",
+                        overflow: "auto",
                       }}
                     >
                       {/* Close button */}
@@ -1143,6 +1184,7 @@ export default function Profile() {
                         flexDirection: "column",
                         gap: 12,
                         background: "var(--panel)",
+                        flexShrink: 0,
                       }}
                     >
                       <div
@@ -1238,7 +1280,7 @@ export default function Profile() {
                         </div>
                       </div>
 
-                      {/* Meta row with date and optional delete */}
+                      {/* Meta row with date, view completion card button, and optional delete */}
                       <div
                         style={{
                           display: "flex",
@@ -1247,6 +1289,7 @@ export default function Profile() {
                           fontSize: "0.8rem",
                           color: "var(--muted)",
                           marginTop: 4,
+                          gap: 12,
                         }}
                       >
                         <span>
@@ -1264,6 +1307,26 @@ export default function Profile() {
                             });
                           })()}
                         </span>
+                        {isOwnProfile && 
+                         selectedPost.quest_id && 
+                         completed.some((cq) => cq.id === selectedPost.quest_id || cq.quest_id === selectedPost.quest_id) && (
+                          <button
+                            onClick={() => showCompletionCardForPost(selectedPost)}
+                            style={{
+                              background: "transparent",
+                              border: "1px solid var(--mint)",
+                              color: "var(--mint)",
+                              padding: "4px 12px",
+                              borderRadius: 999,
+                              cursor: "pointer",
+                              fontSize: "0.75rem",
+                              fontWeight: 600,
+                              whiteSpace: "nowrap",
+                            }}
+                          >
+                            View Completion Card
+                          </button>
+                        )}
                         {isOwnProfile && (
                           <button
                             onClick={async () => {
@@ -1306,8 +1369,24 @@ export default function Profile() {
                       borderLeft: "1px solid var(--muted)",
                       padding: 16,
                       maxWidth: "360px",
+                      position: "relative",
                     }}
                   >
+                    {/* Jellies background */}
+                    <div
+                      style={{
+                        position: "absolute",
+                        inset: 0,
+                        backgroundImage: "url(/jellies.svg)",
+                        backgroundSize: "cover",
+                        backgroundPosition: "center",
+                        backgroundRepeat: "no-repeat",
+                        opacity: 0.4,
+                        pointerEvents: "none",
+                        zIndex: 0,
+                      }}
+                    />
+                    <div style={{ position: "relative", zIndex: 1, display: "flex", flexDirection: "column", flex: 1 }}>
                     <div
                       style={{
                         fontSize: "0.9rem",
@@ -1447,6 +1526,7 @@ export default function Profile() {
                         Post
                       </button>
                     </div>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -1520,6 +1600,19 @@ export default function Profile() {
         <PostModal
           onClose={() => setShowPostModal(false)}
           onSubmit={handleUpload}
+        />
+      )}
+
+      {showCompletionCard && completionData && (
+        <CompletionCard
+          questTitle={completionData.questTitle}
+          timeToComplete={completionData.timeToComplete}
+          difficulty={completionData.difficulty}
+          difficultyLabel={completionData.difficultyLabel}
+          onClose={() => {
+            setShowCompletionCard(false);
+            setCompletionData(null);
+          }}
         />
       )}
     </div>

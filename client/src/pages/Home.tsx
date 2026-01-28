@@ -3,7 +3,8 @@ import { useLocation } from "react-router-dom";
 import LiquidEther from "../components/LiquidEther";
 import PostModal from "../components/PostModal";
 import PostCard from "../components/PostCard";
-import { fetchPosts, uploadPost, votePost, fetchComments, createComment } from "../services/api";
+import CompletionCard from "../components/CompletionCard";
+import { fetchPosts, uploadPost, votePost, fetchComments, createComment, getQuestDifficulty } from "../services/api";
 import { useAuth } from "../context/AuthContext";
 import type { Post } from "../types/post";
 import type { Comment } from "../types/comment";
@@ -13,9 +14,15 @@ type Vote = -1 | 0 | 1;
 export default function Home() {
   const { token } = useAuth();
   const location = useLocation();
-  const completedQuestIdFromProfile =
-    (location.state as { completedQuestId?: string } | null)?.completedQuestId ??
-    null;
+  const locationState = (location.state as {
+    completedQuestId?: string;
+    completedQuestTitle?: string;
+    receivedAt?: string;
+  } | null) ?? null;
+  const completedQuestIdFromProfile = locationState?.completedQuestId ?? null;
+  const completedQuestTitle = locationState?.completedQuestTitle ?? null;
+  const receivedAt = locationState?.receivedAt ?? null;
+  
   const [posts, setPosts] = useState<Post[]>([]);
   const [showPostModal, setShowPostModal] = useState(false);
   const [selectedPost, setSelectedPost] = useState<Post | null>(null);
@@ -28,6 +35,13 @@ export default function Home() {
   >(completedQuestIdFromProfile);
   const [questSearch, setQuestSearch] = useState("");
   const [showUploadSuccess, setShowUploadSuccess] = useState(false);
+  const [showCompletionCard, setShowCompletionCard] = useState(false);
+  const [completionData, setCompletionData] = useState<{
+    questTitle: string;
+    timeToComplete: { days: number; hours: number; minutes: number };
+    difficulty: number;
+    difficultyLabel: string;
+  } | null>(null);
 
   // If we navigated here from Profile after completing a quest, auto-open the post modal
   useEffect(() => {
@@ -36,6 +50,68 @@ export default function Home() {
       setShowPostModal(true);
     }
   }, [token, completedQuestIdFromProfile]);
+
+  // Calculate completion data when post modal closes after completing a quest
+  useEffect(() => {
+    // Only trigger if we have all required data and the post modal just closed
+    if (!showPostModal && completedQuestIdFromProfile && completedQuestTitle && token) {
+      const calculateCompletionData = async () => {
+        try {
+          // Calculate time difference
+          // Use receivedAt if available, otherwise default to 1 hour ago (fallback for old quests)
+          const receivedTime = receivedAt 
+            ? new Date(receivedAt).getTime() 
+            : Date.now() - (60 * 60 * 1000); // 1 hour ago as fallback
+          const completedTime = Date.now();
+          const diffMs = completedTime - receivedTime;
+          
+          const days = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+          const hours = Math.floor((diffMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+          const minutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+
+          // Get difficulty
+          const difficultyData = await getQuestDifficulty(completedQuestIdFromProfile);
+          const completionRate = difficultyData.completion_rate;
+
+          // Determine difficulty level (inverse: lower completion rate = higher difficulty)
+          // Cutoffs: 80%, 60%, 40%, 20%, 5%
+          let difficulty = 0;
+          let difficultyLabel = "surface";
+          if (completionRate >= 80) {
+            difficulty = 1;
+            difficultyLabel = "surface";
+          } else if (completionRate >= 60) {
+            difficulty = 2;
+            difficultyLabel = "twilight";
+          } else if (completionRate >= 40) {
+            difficulty = 3;
+            difficultyLabel = "midnight";
+          } else if (completionRate >= 20) {
+            difficulty = 4;
+            difficultyLabel = "abyssal";
+          } else if (completionRate >= 5) {
+            difficulty = 5;
+            difficultyLabel = "hadal";
+          } else {
+            difficulty = 5;
+            difficultyLabel = "hadal";
+          }
+
+          setCompletionData({
+            questTitle: completedQuestTitle,
+            timeToComplete: { days, hours, minutes },
+            difficulty,
+            difficultyLabel,
+          });
+          setShowCompletionCard(true);
+        } catch (error) {
+          console.error("Failed to calculate completion data:", error);
+        }
+      };
+
+      void calculateCompletionData();
+    }
+  }, [showPostModal, completedQuestIdFromProfile, completedQuestTitle, receivedAt, token]);
 
   useEffect(() => {
     if (!showUploadSuccess) return;
@@ -221,13 +297,14 @@ export default function Home() {
               style={{
                 display: "flex",
                 alignItems: "center",
-                gap: "2rem",
+                gap: "0.5rem",
                 padding: "1.5em 2em",
                 fontWeight: 700,
                 fontSize: "1rem",
                 animationDelay: "0.5s",
               }}
             >
+              <img src="/turtle.svg" alt="" width={24} height={24} style={{ opacity: 0.8 }} />
               Post
             </button>
           </div>
@@ -263,6 +340,55 @@ export default function Home() {
             ))}
           </div>
         )}
+
+        {/* Field Guide */}
+        <div
+          style={{
+            marginTop: 64,
+            padding: 32,
+            background: "var(--panel)",
+            borderRadius: 16,
+            border: "1px solid rgba(255,255,255,0.1)",
+            maxWidth: 800,
+            marginLeft: "auto",
+            marginRight: "auto",
+          }}
+        >
+          <h2
+            style={{
+              marginTop: 0,
+              marginBottom: 24,
+              fontSize: "1.8rem",
+              fontWeight: 700,
+              color: "var(--text)",
+            }}
+          >
+            Field Guide
+          </h2>
+          <div
+            style={{
+              fontSize: "0.95rem",
+              lineHeight: 1.7,
+              color: "var(--text)",
+              display: "flex",
+              flexDirection: "column",
+              gap: 16,
+            }}
+          >
+            <p style={{ margin: 0 }}>
+              Friends may challenge each other to quests. Be mindful of challenges, quests cannot be removed once received! Once received, quests can be marked completed and posted, view your earned completion cards in your profile.
+            </p>
+            <p style={{ margin: 0 }}>
+              Completed quests give badges displayed on your profile. Badges also have two statistics, the yellow number is the number of votes your top voted post in the quest category has, while the green number is how many posts you have in that quest category. Numbers will glow the higher they are!
+            </p>
+            <p style={{ margin: 0 }}>
+              Any user can submit a quest and choose a corresponding badge icon.
+            </p>
+            <p style={{ margin: 0 }}>
+              Quests are ranked in difficulty from surface, twilight, midnight, abyssal, to hadal. These represent average completed/received ratios over all users of 80%, 60%, 40%, 20%, and 5% respectively.
+            </p>
+          </div>
+        </div>
       </div>
 
       {showUploadSuccess && (
@@ -294,6 +420,19 @@ export default function Home() {
           }}
           onSubmit={handleUpload}
           initialQuestId={initialQuestForPostModal ?? undefined}
+        />
+      )}
+
+      {showCompletionCard && completionData && (
+        <CompletionCard
+          questTitle={completionData.questTitle}
+          timeToComplete={completionData.timeToComplete}
+          difficulty={completionData.difficulty}
+          difficultyLabel={completionData.difficultyLabel}
+          onClose={() => {
+            setShowCompletionCard(false);
+            setCompletionData(null);
+          }}
         />
       )}
 
@@ -509,17 +648,33 @@ export default function Home() {
                 borderLeft: "1px solid var(--muted)",
                 padding: 16,
                 maxWidth: "360px",
+                position: "relative",
               }}
             >
+              {/* Jellies background */}
               <div
                 style={{
-                  fontSize: "0.9rem",
-                  fontWeight: 600,
-                  marginBottom: 8,
+                  position: "absolute",
+                  inset: 0,
+                  backgroundImage: "url(/jellies.svg)",
+                  backgroundSize: "cover",
+                  backgroundPosition: "center",
+                  backgroundRepeat: "no-repeat",
+                  opacity: 0.15,
+                  pointerEvents: "none",
+                  zIndex: 0,
                 }}
-              >
-                Comments
-              </div>
+              />
+              <div style={{ position: "relative", zIndex: 1, display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
+                <div
+                  style={{
+                    fontSize: "0.9rem",
+                    fontWeight: 600,
+                    marginBottom: 8,
+                  }}
+                >
+                  Comments
+                </div>
 
               <div
                 style={{
@@ -649,6 +804,7 @@ export default function Home() {
                 >
                   Post
                 </button>
+              </div>
               </div>
             </div>
           </div>

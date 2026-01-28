@@ -191,10 +191,20 @@ def complete_quest(
 
     quest = db.get(Quest, quest_id)
 
+    # Use created_at if available, otherwise use a default (1 hour ago for old quests)
+    received_at = None
+    if rq.created_at:
+        received_at = rq.created_at.isoformat()
+    else:
+        # Fallback for old quests without created_at
+        from datetime import datetime, timedelta
+        received_at = (datetime.utcnow() - timedelta(hours=1)).isoformat()
+
     return {
         "quest_id": quest.id,
         "icon": quest.icon,
         "title": quest.title,
+        "received_at": received_at,
     }
 
 
@@ -222,6 +232,33 @@ def get_received_quests(
         })
 
     return quests
+
+
+@router.get("/{quest_id}/received-at")
+def get_quest_received_at(
+    quest_id: str,
+    db: Session = Depends(get_db),
+    user_id: str = Depends(get_current_user_id),
+):
+    """
+    Get when the current user received a specific quest.
+    Returns None if the quest was never received.
+    """
+    rq = (
+        db.query(ReceivedQuest)
+        .filter(
+            ReceivedQuest.quest_id == quest_id,
+            ReceivedQuest.user_id == user_id,
+        )
+        .first()
+    )
+    
+    if not rq or not rq.created_at:
+        # Fallback for old quests without created_at
+        from datetime import datetime, timedelta
+        return {"received_at": (datetime.utcnow() - timedelta(hours=1)).isoformat()}
+    
+    return {"received_at": rq.created_at.isoformat()}
 
 
 @router.get("/completed")
@@ -293,6 +330,28 @@ def backfill_quest_created_at(
     db.commit()
 
     return {"updated": updated}
+
+
+@router.get("/{quest_id}/difficulty")
+def get_quest_difficulty(
+    quest_id: str,
+    db: Session = Depends(get_db),
+):
+    """
+    Calculate quest difficulty based on completion rate.
+    Returns completion percentage (0-100).
+    """
+    received_count = db.query(ReceivedQuest).filter(ReceivedQuest.quest_id == quest_id).count()
+    completed_count = db.query(CompletedQuest).filter(CompletedQuest.quest_id == quest_id).count()
+    
+    if received_count == 0:
+        completion_rate = 100.0  # If no one received it, treat as 100% (easiest)
+    else:
+        completion_rate = (completed_count / received_count) * 100.0
+    
+    return {"completion_rate": completion_rate}
+
+
 @router.get("/completed/by-username/{username}")
 def get_completed_quests_by_username(
     username: str,

@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import type { Sidequest } from "../types/sidequest";
-import { fetchQuests } from "../services/api";
+import { fetchReceivedQuests } from "../services/api";
+import { useAuth } from "../context/AuthContext";
 
 interface Props {
   onClose: () => void;
@@ -9,6 +10,7 @@ interface Props {
 }
 
 export default function PostModal({ onClose, onSubmit, initialQuestId }: Props) {
+  const { token } = useAuth();
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [quests, setQuests] = useState<Sidequest[]>([]);
@@ -20,17 +22,18 @@ export default function PostModal({ onClose, onSubmit, initialQuestId }: Props) 
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    fetchQuests().then((qs) => {
+    if (!token) return;
+    fetchReceivedQuests(token).then((qs: Sidequest[]) => {
       setQuests(qs);
       if (initialQuestId) {
-        const match = qs.find((q) => q.id === initialQuestId);
+        const match = qs.find((q: Sidequest) => q.id === initialQuestId);
         if (match) {
           setSelectedQuestId(match.id);
           setSearchQuery(match.title);
         }
       }
     });
-  }, [initialQuestId]);
+  }, [initialQuestId, token]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -111,7 +114,10 @@ export default function PostModal({ onClose, onSubmit, initialQuestId }: Props) 
           maxWidth: "90vw",
         }}
       >
-        <h3>Create Post</h3>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+          <h3 style={{ margin: 0 }}>Create Post</h3>
+          <img src="/turtle.svg" alt="" width={70} height={70} style={{ opacity: 0.7 }} />
+        </div>
 
         {/* File Upload */}
         <div style={{ marginBottom: 16 }}>

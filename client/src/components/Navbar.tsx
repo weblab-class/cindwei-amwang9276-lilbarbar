@@ -98,6 +98,11 @@ export default function Navbar() {
         </Link>
       </nav>
 
+      {/* Whale decoration */}
+      <div style={{ display: "flex", justifyContent: "center", marginTop: "auto", marginBottom: "1rem" }}>
+        <img src="/whale.svg" alt="" width={200} height={200} style={{ opacity: 0.7 }} />
+      </div>
+
       {/* Logout */}
       <button
         className="secondary"

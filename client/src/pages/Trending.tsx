@@ -3,7 +3,7 @@ import type { Sidequest } from "../types/sidequest";
 import SidequestCard from "../components/SidequestCard";
 import SubmitQuestModal from "../components/SubmitQuestModal";
 import ShareQuestModal from "../components/ShareQuestModal";
-import { fetchQuests, createQuest, voteQuest } from "../services/api";
+import { fetchQuests, createQuest, voteQuest, getQuestDifficulty } from "../services/api";
 import { useAuth } from "../context/AuthContext";
 import LiquidEther from "../components/LiquidEther";
 
@@ -19,20 +19,67 @@ export default function Trending() {
   const [timePeriod, setTimePeriod] = useState<"all" | "month" | "week">("all");
 
   useEffect(() => {
-    fetchQuests(timePeriod).then(setQuests);
-  }, [timePeriod]);
+    fetchQuests({ period: timePeriod, token: token ?? undefined }).then(setQuests);
+  }, [timePeriod, token]);
+  
   const [myVotes, setMyVotes] = useState<Record<string, Vote>>({});
+  const [questDifficulties, setQuestDifficulties] = useState<Record<string, { difficulty: number; difficultyLabel: string }>>({});
 
   useEffect(() => {
-    fetchQuests(token ?? undefined).then((qs) => {
+    fetchQuests({ period: timePeriod, token: token ?? undefined }).then(async (qs) => {
       setQuests(qs);
       const next: Record<string, Vote> = {};
       for (const q of qs as Sidequest[]) {
         next[q.id] = (q.my_vote ?? 0) as Vote;
       }
       setMyVotes(next);
+
+      // Fetch difficulty for each quest
+      const difficultyPromises = (qs as Sidequest[]).map(async (q) => {
+        try {
+          const difficultyData = await getQuestDifficulty(q.id);
+          const completionRate = difficultyData.completion_rate;
+
+          // Determine difficulty level (same logic as in Home.tsx and Profile.tsx)
+          let difficulty = 0;
+          let difficultyLabel = "surface";
+          if (completionRate >= 80) {
+            difficulty = 1;
+            difficultyLabel = "surface";
+          } else if (completionRate >= 60) {
+            difficulty = 2;
+            difficultyLabel = "twilight";
+          } else if (completionRate >= 40) {
+            difficulty = 3;
+            difficultyLabel = "midnight";
+          } else if (completionRate >= 20) {
+            difficulty = 4;
+            difficultyLabel = "abyssal";
+          } else if (completionRate >= 5) {
+            difficulty = 5;
+            difficultyLabel = "hadal";
+          } else {
+            difficulty = 5;
+            difficultyLabel = "hadal";
+          }
+
+          return { questId: q.id, difficulty, difficultyLabel };
+        } catch (error) {
+          console.error(`Failed to fetch difficulty for quest ${q.id}:`, error);
+          return null;
+        }
+      });
+
+      const difficulties = await Promise.all(difficultyPromises);
+      const difficultyMap: Record<string, { difficulty: number; difficultyLabel: string }> = {};
+      for (const d of difficulties) {
+        if (d) {
+          difficultyMap[d.questId] = { difficulty: d.difficulty, difficultyLabel: d.difficultyLabel };
+        }
+      }
+      setQuestDifficulties(difficultyMap);
     });
-  }, [token]);
+  }, [token, timePeriod]);
 
   async function handleVote(id: string, direction: 1 | -1) {
     if (!token) return;
@@ -55,10 +102,10 @@ export default function Trending() {
     } catch (e) {
       console.error("Failed to vote on quest:", e);
       // Optionally reload from server if you want to fully sync:
-      fetchQuests(timePeriod).then(setQuests);
+      fetchQuests({ period: timePeriod, token: token ?? undefined }).then(setQuests);
       setMyVotes((prev) => ({ ...prev, [id]: prevVote }));
       // Reload from server to fully sync:
-      fetchQuests(token).then(setQuests);
+      fetchQuests({ period: timePeriod, token: token ?? undefined }).then(setQuests);
     }
   }
 
@@ -69,7 +116,7 @@ export default function Trending() {
   }
 
   return (
-    <div style={{ padding: 24, paddingRight: 48, backgroundColor: "#000000", minHeight: "100vh", position: "relative" }}>
+    <div style={{ padding: 24, paddingRight: 200, backgroundColor: "#000000", minHeight: "100vh", position: "relative" }}>
       {/* react bit liquid background */}
       <div style={{ 
         width: '100vw', 
@@ -97,11 +144,26 @@ export default function Trending() {
         </div>
       </div>
       
+      {/* Fish decoration in right margin */}
+      <div
+        style={{
+          position: "fixed",
+          right: 24,
+          top: "50%",
+          transform: "translateY(-50%)",
+          zIndex: 1,
+          pointerEvents: "none",
+        }}
+      >
+        <img src="/fish.svg" alt="" width={220} height={420} style={{ opacity: 0.4 }} />
+      </div>
+
       {/* content */}
       <div style={{ position: "relative", zIndex: 1 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
           <h2 style={{ margin: 0 }}>Trending Quests</h2>
           <button onClick={() => setShowModal(true)} style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+            <img src="/turtle.svg" alt="" width={24} height={24} style={{ opacity: 0.8 }} />
             Add Quest
           </button>
         </div>
@@ -158,16 +220,21 @@ export default function Trending() {
           </button>
         </div>
 
-      {quests.map((q, index) => (
-        <SidequestCard
-          key={q.id}
-          quest={q}
-          myVote={myVotes[q.id] ?? 0}
-          onVote={handleVote}
-          onShare={() => setShareQuestId(q.id)}
-          index={index}
-        />
-      ))}
+      {quests.map((q, index) => {
+        const difficultyData = questDifficulties[q.id];
+        return (
+          <SidequestCard
+            key={q.id}
+            quest={q}
+            myVote={myVotes[q.id] ?? 0}
+            onVote={handleVote}
+            onShare={() => setShareQuestId(q.id)}
+            index={index}
+            difficulty={difficultyData?.difficulty}
+            difficultyLabel={difficultyData?.difficultyLabel}
+          />
+        );
+      })}
       {shareQuestId && (
         <ShareQuestModal
           questId={shareQuestId}

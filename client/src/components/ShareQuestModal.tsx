@@ -33,7 +33,7 @@ export default function ShareQuestModal({ questId, onClose }: Props) {
   return (
     <div style={overlay}>
       <div style={modal}>
-        <h3>Share Quest</h3>
+        <h3>Send Quest</h3>
 
         {loading && <p>Loading friends…</p>}
 

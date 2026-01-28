@@ -1,16 +1,29 @@
 const API = import.meta.env.VITE_API_URL;
 
-export async function fetchQuests(period: "all" | "month" | "week" = "all") {
-  const res = await fetch(`${API}/quests?period=${period}`);
-export async function fetchQuests(token?: string) {
-  const res = await fetch(
-    token ? `${API}/quests/with_votes` : `${API}/quests`,
-    token
-      ? { headers: { Authorization: `Bearer ${token}` } }
-      : undefined
-  );
+export async function fetchQuests({
+  period = "all",
+  token,
+}: {
+  period?: "all" | "month" | "week";
+  token?: string;
+} = {}) {
+  const url = token
+    ? `${API}/quests/with_votes?period=${period}`
+    : `${API}/quests?period=${period}`;
+
+  const res = await fetch(url, {
+    headers: token
+      ? { Authorization: `Bearer ${token}` }
+      : undefined,
+  });
+
+  if (!res.ok) {
+    throw new Error("Failed to fetch quests");
+  }
+
   return res.json();
 }
+
 
 
 export async function createQuest(
@@ -125,6 +138,24 @@ export async function completeQuest(
   return res.json();
 }
 
+export async function getQuestDifficulty(questId: string) {
+  const res = await fetch(`${API}/quests/${questId}/difficulty`);
+  if (!res.ok) {
+    throw new Error("Failed to fetch quest difficulty");
+  }
+  return res.json();
+}
+
+export async function getQuestReceivedAt(token: string, questId: string) {
+  const res = await fetch(`${API}/quests/${questId}/received-at`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) {
+    throw new Error("Failed to fetch quest received at");
+  }
+  return res.json();
+}
+
 export async function shareQuest(
   token: string,
   questId: string,
@@ -163,15 +194,26 @@ export async function fetchCompletedQuests(token: string) {
   return res.json();
 }
 
-export async function fetchCompletedQuestsForUser(token: string, userId: string) {
-  const res = await fetch(`${API}/quests/completed/by-user/${encodeURIComponent(userId)}`, {
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
-  });
+export async function fetchCompletedQuestsForUser(
+  token: string,
+  userId: string
+) {
+  const res = await fetch(
+    `${API}/quests/completed/by-user/${encodeURIComponent(userId)}`,
+    {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    }
+  );
 
   if (!res.ok) {
     throw new Error("Failed to fetch completed quests for user");
+  }
+
+  return res.json();
+}
+
 export async function fetchCompletedQuestsByUsername(
   token: string,
   username: string
@@ -191,6 +233,7 @@ export async function fetchCompletedQuestsByUsername(
 
   return res.json();
 }
+
 
 // Posts API
 export async function uploadPost(
