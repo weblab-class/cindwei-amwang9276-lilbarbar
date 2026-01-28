@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import * as THREE from 'three';
 import './LiquidEther.css';
 
+//citation: from reactbits liquidether
 export default function LiquidEther({
   mouseForce = 20,
   cursorSize = 100,
