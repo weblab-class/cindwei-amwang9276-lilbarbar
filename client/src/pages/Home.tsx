@@ -43,7 +43,7 @@ export default function Home() {
     difficultyLabel: string;
   } | null>(null);
 
-  // If we navigated here from Profile after completing a quest, auto-open the post modal
+  //  open the post modal after completing a quest from profile
   useEffect(() => {
     if (token && completedQuestIdFromProfile) {
       setInitialQuestForPostModal(completedQuestIdFromProfile);
@@ -58,10 +58,10 @@ export default function Home() {
       const calculateCompletionData = async () => {
         try {
           // Calculate time difference
-          // Use receivedAt if available, otherwise default to 1 hour ago (fallback for old quests)
+          // Use receivedAt if available, otherwise default to 1 hour ago 
           const receivedTime = receivedAt 
             ? new Date(receivedAt).getTime() 
-            : Date.now() - (60 * 60 * 1000); // 1 hour ago as fallback
+            : Date.now() - (60 * 60 * 1000); 
           const completedTime = Date.now();
           const diffMs = completedTime - receivedTime;
           
@@ -73,7 +73,7 @@ export default function Home() {
           const difficultyData = await getQuestDifficulty(completedQuestIdFromProfile);
           const completionRate = difficultyData.completion_rate;
 
-          // Determine difficulty level (inverse: lower completion rate = higher difficulty)
+          // Determine difficulty level
           // Cutoffs: 80%, 60%, 40%, 20%, 5%
           let difficulty = 0;
           let difficultyLabel = "surface";
@@ -147,7 +147,6 @@ export default function Home() {
   }, [token]);
 
   useEffect(() => {
-    // Defer to avoid synchronous setState within effect body (eslint rule)
     const t = window.setTimeout(() => {
       void loadPosts();
     }, 0);
@@ -170,7 +169,6 @@ export default function Home() {
     const delta = nextVote - prevVote; // -2, -1, +1, +2
     if (delta === 0) return;
 
-    // optimistic UI update
     setMyVotes((prev) => ({ ...prev, [postId]: nextVote }));
     try {
       await votePost(token, postId, delta);
@@ -186,7 +184,7 @@ export default function Home() {
       );
     } catch (error) {
       console.error("Failed to vote:", error);
-      // rollback optimistic vote state if request failed
+      // rollback vote state if request failed
       setMyVotes((prev) => ({ ...prev, [postId]: prevVote }));
     }
   }
@@ -310,7 +308,7 @@ export default function Home() {
           </div>
         </div>
 
-        {/* Masonry-style posts (4 columns, variable card heights) */}
+        {/* Style posts (4 columns, variable card heights) */}
         {filteredPosts.length === 0 ? (
           <div style={{ textAlign: "center", padding: "48px", color: "var(--muted)" }}>
             {posts.length === 0 && questSearch.trim().length === 0
@@ -638,7 +636,7 @@ export default function Home() {
               </div>
             </div>
 
-            {/* Right: comments full-height column */}
+            {/* Right: comments column */}
             <div
               style={{
                 flex: 2,

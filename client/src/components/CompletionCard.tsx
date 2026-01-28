@@ -1,7 +1,7 @@
 interface Props {
   questTitle: string;
   timeToComplete: { days: number; hours: number; minutes: number };
-  difficulty: number; // 0-5 (number of segments filled)
+  difficulty: number; // 1-5 
   difficultyLabel: string;
   onClose: () => void;
 }

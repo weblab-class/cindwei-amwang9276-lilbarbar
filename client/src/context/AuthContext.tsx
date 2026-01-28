@@ -50,7 +50,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
 
     if (!res.ok) {
-      // let the caller show the appropriate message
       throw new Error("LOGIN_FAILED");
     }
     const data = await res.json();

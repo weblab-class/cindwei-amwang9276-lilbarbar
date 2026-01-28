@@ -101,7 +101,7 @@ export default function Trending() {
       await voteQuest(token, id, delta);
     } catch (e) {
       console.error("Failed to vote on quest:", e);
-      // Optionally reload from server if you want to fully sync:
+
       fetchQuests({ period: timePeriod, token: token ?? undefined }).then(setQuests);
       setMyVotes((prev) => ({ ...prev, [id]: prevVote }));
       // Reload from server to fully sync:

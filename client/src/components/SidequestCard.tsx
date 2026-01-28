@@ -8,7 +8,7 @@ interface Props {
   onVote: (id: string, direction: 1 | -1) => void;
   onShare: (id: string) => void;
   index?: number;
-  difficulty?: number; // 0-5 (number of segments filled)
+  difficulty?: number; // 1-5 (number of segments filled)
   difficultyLabel?: string;
 }
 

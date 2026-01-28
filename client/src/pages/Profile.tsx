@@ -357,8 +357,6 @@ export default function Profile() {
     setPfpUrl(null);
   }, [profileUsername]);
 
-  //load badges here NOT IMPLEMENTED TODO
-
   if (!user) {
     return <p>Not logged in</p>;
   }
@@ -404,7 +402,7 @@ export default function Profile() {
         </div>
       </div>
 
-      {/* Kraken decoration in bottom right - behind UI but in front of react bit background */}
+      {/* Kraken decoration in bottom right */}
       <div
         style={{
           position: "fixed",

@@ -57,7 +57,7 @@ export default function PostCard({ post, myVote = 0, onVote, onOpen }: Props) {
             justifyContent: "center",
           }}
         >
-          {/* Vote buttons overlay (top-right) */}
+          {/* Vote buttons */}
           <div
             style={{
               position: "absolute",
